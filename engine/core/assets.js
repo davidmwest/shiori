@@ -1,20 +1,25 @@
 // Asset checks: every declared file exists, including every combination a
-// character's sprite templates can produce.
+// character's sprite templates can produce. Attribute groups are names from
+// the script, so they are looked up as own properties: a group called
+// `constructor` is just a name.
+
+import { has } from './registry.js';
 
 export function templateGroups(tpl) {
   return (String(tpl).match(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g) || []).map(s => s.slice(1, -1));
 }
 
 export function fillTemplate(tpl, attrs) {
-  return String(tpl).replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (m, g) => attrs[g] != null ? attrs[g] : m);
+  return String(tpl).replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (m, g) => has(attrs, g) && attrs[g] != null ? attrs[g] : m);
 }
 
 export function expandTemplate(tpl, groups, cap = 400) {
   const names = templateGroups(tpl).filter((g, i, a) => a.indexOf(g) === i);
-  let combos = [{}];
+  let combos = [Object.create(null)];
   for (const g of names) {
     const next = [];
-    for (const c of combos) for (const v of (groups[g] || [])) { next.push({ ...c, [g]: v }); if (next.length > cap) break; }
+    const values = has(groups, g) ? groups[g] : [];
+    for (const c of combos) for (const v of values) { const n = Object.assign(Object.create(null), c); n[g] = v; next.push(n); if (next.length > cap) break; }
     combos = next;
   }
   return combos.map(c => fillTemplate(tpl, c));

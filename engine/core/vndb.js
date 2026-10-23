@@ -18,6 +18,11 @@
 
 import { analyze } from './analyze.js';
 import { PLATFORMS } from './header.js';
+import { has } from './registry.js';
+
+// Own-property lookup into tables keyed by names from the script, so a
+// character or @gameplay called `constructor` is just a name.
+const lookup = (t, k) => has(t, k) ? t[k] : undefined;
 
 const TAG = {
   adv: ['g32', 'ADV'], nvl: ['g43', 'NVL'], mixing: ['g2734', 'ADV/NVL Mixing'], briefNvl: ['g355', 'Brief NVL Scenes'],
@@ -96,8 +101,12 @@ export function vndbReport(program, opts = {}) {
   if (!a.reachableWords) add('content', 'warn', 'No reachable text', 'The game shows no text from its start scene.');
   if (ex) {
     if (ex.errors.length) add('runtime', 'warn', 'Runtime errors on some routes', `${ex.errors.length} problem(s); run \`shiori explore\` for details.`);
-    if (ex.truncated) add('explore', 'info', 'Route exploration was cut short', `The story has too many states to explore within --max-states ${ex.maxStates}; ending counts come from the @ending declarations instead.`);
-    else if (ex.unlocksPartial) add('explore', 'info', 'Route exploration was cut short', `After ${ex.playthroughs} playthroughs in a row from ${ex.unlockStates} different sets of endings seen and @persistent values, replaying still unlocked new ones; ending counts come from the @ending declarations instead.`);
+    if (ex.truncated) add('explore', 'info', 'Route exploration was cut short', `The story has too many states to explore within --max-states ${ex.maxStates}; ending counts come from the @ending declarations instead.`, `To explore further, run \`shiori vndb --max-states ${ex.maxStates * 8}\`.`);
+    else if (ex.unlocksPartial) {
+      // The R706 note says which limit stopped the replays (--passes works for vndb too).
+      const note = ex.warnings.find(w => w.code === 'R706');
+      add('explore', 'info', 'Route exploration was cut short', `After ${plural(ex.playthroughs, 'playthrough')} in a row from ${plural(ex.unlockStates, 'different set')} of endings seen and @persistent values, replaying still unlocked new ones; ending counts come from the @ending declarations instead.`, note && note.hint ? note.hint : undefined);
+    }
     else if (ex.unreachedEndings.length) add('endings', 'warn', 'Some endings can never be reached', ex.unreachedEndings.map(e => `${e.title} [${e.id}]`).join(', ') + '.', 'Run `shiori explore` to see why.');
   }
 
@@ -121,7 +130,7 @@ export function vndbReport(program, opts = {}) {
     title: h.title, original_title: h.original_title || null, romanized: h.romanized_title || null,
     type: h.release_type, status: h.status, released: h.release_date || 'TBA',
     language: h.language, machine_translation: ai.includes('translation') || ai.includes('all'),
-    platforms: (h.platforms || []).map(p => PLATFORMS[p] || p),
+    platforms: (h.platforms || []).map(p => lookup(PLATFORMS, p) || p),
     engine: 'Shiori', resolution: `${h.width}x${h.height}`,
     voiced, voiced_note: voicing.note, has_ero: !!h.ero, min_age: h.age_rating != null ? h.age_rating : (h.ero ? 18 : null),
     freeware: !!h.freeware, doujin: !!h.doujin, official: !!h.official, censoring: h.ero ? h.censored : 'n/a',
@@ -166,7 +175,7 @@ export function vndbReport(program, opts = {}) {
       : { note: 'VNDB leaves Length empty for partial and trial releases.' },
     original_language: h.language,
   };
-  const characters = chars.map(c => ({ id: c.id, name: c.name, original: c.vndb.original_name || null, role: c.vndb.role || (c.spoke ? 'side' : 'appears'), gender: c.vndb.gender || null, age: c.vndb.age || null, description: c.vndb.description || null, voice: c.vndb.cv || null, lines: (a.perCharacter[c.id] || {}).lines || 0 }));
+  const characters = chars.map(c => ({ id: c.id, name: c.name, original: c.vndb.original_name || null, role: c.vndb.role || (c.spoke ? 'side' : 'appears'), gender: c.vndb.gender || null, age: c.vndb.age || null, description: c.vndb.description || null, voice: c.vndb.cv || null, lines: (lookup(a.perCharacter, c.id) || {}).lines || 0 }));
 
   const worst = checks.some(c => c.status === 'warn');
   const verdict = classification === 'none' ? 'may fall outside VNDB\'s definition of a visual novel'
@@ -197,8 +206,8 @@ export function vndbReport(program, opts = {}) {
 function voiceCoverage(program, a) {
   const speakers = Object.entries(a.perCharacter);
   if (!speakers.some(([, v]) => v.voiced)) return { status: 'Not voiced', note: null };
-  const role = (k) => { const c = program.decls.characters[k]; return c && c.vndb ? c.vndb.role : null; };
-  const declared = speakers.filter(([k]) => program.decls.characters[k]);
+  const role = (k) => { const c = lookup(program.decls.characters, k); return c && c.vndb ? c.vndb.role : null; };
+  const declared = speakers.filter(([k]) => has(program.decls.characters, k));
   const named = declared.filter(([k]) => role(k) !== 'protagonist');
   const minor = (k, v) => role(k) === 'appears' || v.lines < 0.05 * a.dialogueLines;
   let core = named.filter(([k, v]) => !minor(k, v));
@@ -213,10 +222,12 @@ function voiceCoverage(program, a) {
   return { status: 'Partially voiced', note: `${note ? note + ' ' : ''}Not fully voiced: ${short.map(([, v]) => `${v.name} (${v.voiced} of ${v.lines} lines)`).join(', ')}.` };
 }
 
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
 function summGames(list) {
-  const by = {};
-  for (const g of list) by[g.id] = (by[g.id] || 0) + g.minutes;
-  return Object.entries(by).map(([k, m]) => `${k} (~${m} min)`).join(', ');
+  const by = new Map();
+  for (const g of list) by.set(g.id, (by.get(g.id) || 0) + g.minutes);
+  return [...by].map(([k, m]) => `${k} (~${m} min)`).join(', ');
 }
 
 const ICON = { pass: '✓', warn: '⚠', fail: '✗', info: 'ℹ', manual: '☐' };

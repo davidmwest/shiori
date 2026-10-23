@@ -13,6 +13,7 @@ import { VM, newPersistent } from './vm.js';
 import { clone, wordWeight } from './util.js';
 import { collectRefs, exprToString } from './expr.js';
 import { liveness } from './analyze.js';
+import { has } from './registry.js';
 
 const MAX_RANDOM_BRANCHES = 6;
 // Later playthroughs: at most this many in a row, and at most this many
@@ -40,6 +41,20 @@ const FLIP = { '<': '>', '>': '<', '<=': '>=', '>=': '<=', '==': '==', '!=': '!=
 const isLit = (n) => n && (n.t === 'num' || n.t === 'str' || n.t === 'bool');
 const TRUTHY = { kind: 'truthy' }, OTHER = { kind: 'other' };
 
+// Tables keyed by names from the script (variables, scenes, endings) have no
+// prototype, so `@var constructor` or `@ending __proto__` is just a name.
+// Program tables are read with lookup(): a program read back from JSON has
+// tables with a prototype again.
+const table = () => Object.create(null);
+const lookup = (t, k) => has(t, k) ? t[k] : undefined;
+// A copy of persistent data (endings seen, @persistent values) whose tables
+// have no prototype either.
+function persistentCopy(p) {
+  const out = newPersistent();
+  for (const [k, v] of Object.entries(clone(p || {}))) out[k] = v && typeof v === 'object' && !Array.isArray(v) ? Object.assign(table(), v) : v;
+  return out;
+}
+
 // The largest count worth telling apart for a value that only grows
 // (a visit count, the number of endings seen, a counter only ever raised by
 // a constant): above it, every comparison the script makes comes out the
@@ -57,7 +72,7 @@ function capFor(use) {
 // states between playthroughs) on exactly this.
 export function scanReads(program) {
   const decls = program.decls.vars;
-  const visitCap = {}, varCap = {}, strLits = {};
+  const visitCap = table(), varCap = table(), strLits = table();
   const varOther = new Set(), notMonotone = new Set(), exprVars = new Set();
   const endingIds = new Set();
   let allEndings = false, countUsed = false, countCap = 0;
@@ -89,7 +104,7 @@ export function scanReads(program) {
   };
   // Variables that decide what happens: read by a condition, or feeding one.
   const condVars = new Set();
-  const feeds = {};
+  const feeds = table();
   for (const ins of program.code) {
     const cond = (ast) => { if (!ast) return; walk(ast, TRUTHY); for (const v of collectRefs(ast).vars) condVars.add(v.name); };
     if (ins.op === 'branch' || ins.op === 'assert') cond(ins.cond);
@@ -107,12 +122,12 @@ export function scanReads(program) {
     changed = false;
     for (const v of [...condVars]) for (const w of feeds[v] || []) if (!condVars.has(w)) { condVars.add(w); changed = true; }
   }
-  const monotoneCap = {};
+  const monotoneCap = table();
   for (const [n, c] of Object.entries(varCap)) {
-    const d = decls[n];
+    const d = lookup(decls, n);
     if (d && typeof d.init === 'number' && !varOther.has(n) && !notMonotone.has(n)) monotoneCap[n] = c;
   }
-  const persistentVars = [...exprVars].filter(n => decls[n] && decls[n].persistent).sort();
+  const persistentVars = [...exprVars].filter(n => { const d = lookup(decls, n); return d && d.persistent; }).sort();
   return { visitCap, monotoneCap, strLits, condVars, endingIds, allEndings, countUsed, countCap, persistentVars };
 }
 
@@ -125,7 +140,7 @@ export function explore(program, opts = {}) {
   const usesPersistent = reads.endingIds.size > 0 || reads.allEndings || reads.countUsed || reads.persistentVars.length > 0;
   const maxPasses = opts.passes || (usesPersistent ? MAX_PASSES : 1);
   const maxUnlockStates = opts.maxUnlockStates || MAX_UNLOCK_STATES;
-  const basePersistent = { ...newPersistent(), ...clone(opts.persistent || {}) };
+  const basePersistent = persistentCopy(opts.persistent);
 
   const clampVar = (n, v) => (typeof v === 'number' && reads.monotoneCap[n] != null) ? Math.min(v, reads.monotoneCap[n]) : v;
   // The part of the unlock state (endings seen, @persistent values) that the
@@ -134,10 +149,10 @@ export function explore(program, opts = {}) {
   relevantIds.sort();
   function persistentKey(p) {
     if (!usesPersistent) return '';
-    let k = 'e=' + relevantIds.filter(id => p.endings[id]).join(',');
-    if (reads.countUsed) k += '|n=' + Math.min(Object.keys(p.endings).filter(id => program.decls.endings[id]).length, reads.countCap);
+    let k = 'e=' + relevantIds.filter(id => has(p.endings, id) && p.endings[id]).join(',');
+    if (reads.countUsed) k += '|n=' + Math.min(Object.keys(p.endings).filter(id => has(program.decls.endings, id)).length, reads.countCap);
     for (const n of reads.persistentVars) {
-      const v = p.vars && n in p.vars ? p.vars[n] : program.decls.vars[n].init;
+      const v = has(p.vars, n) ? p.vars[n] : lookup(program.decls.vars, n).init;
       k += '|' + n + '=' + JSON.stringify(clampVar(n, v));
     }
     return k;
@@ -145,11 +160,11 @@ export function explore(program, opts = {}) {
 
   const report = {
     states: 0, truncated: false, frontier: 0,
-    endings: {}, plainEnds: [], errors: [], assertions: [], warnings: [],
+    endings: table(), plainEnds: [], errors: [], assertions: [], warnings: [],
     linesSeen: new Set(), optionsTaken: new Set(), optionsShown: new Set(), menusSeen: new Set(), scenesSeen: new Set(),
     branches: {}, routes: 0, randomUsed: false,
   };
-  const routeKeys = new Set(), endingRoutes = {};
+  const routeKeys = new Set(), endingRoutes = table();
 
   // Play once from the given unlock state, then again from every new unlock
   // state those playthroughs end in, breadth first, until nothing new
@@ -206,7 +221,7 @@ export function explore(program, opts = {}) {
     if (usesPersistent) k += '|P:' + persistentKey(vm.persistent);
     for (const x of live[at] || []) {
       if (x.startsWith('v:')) {
-        const n = x.slice(2), d = program.decls.vars[n];
+        const n = x.slice(2), d = lookup(program.decls.vars, n);
         k += '|' + n + '=' + JSON.stringify(clampVar(n, d && d.persistent ? vm.persistent.vars[n] : st.vars[n]));
       } else if (x.startsWith('visit:')) {
         const s = x.slice(6), cap = reads.visitCap[s];
@@ -222,7 +237,7 @@ export function explore(program, opts = {}) {
   }
 
   function recordEnding(id, path, words, rolls, pass, startPersistent) {
-    const decl = program.decls.endings[id];
+    const decl = lookup(program.decls.endings, id);
     const e = report.endings[id] = report.endings[id] || { id, title: decl ? decl.title : '(end of story)', kind: decl ? decl.kind : null, routes: 0, shortest: null, pass };
     const rk = routeKey(path, rolls);
     const seenRoutes = endingRoutes[id] = endingRoutes[id] || new Set();
@@ -231,7 +246,7 @@ export function explore(program, opts = {}) {
     const cand = {
       path, words: Math.round(words), rolls: rolls.slice(), pass,
       seen: Object.keys(startPersistent.endings).sort(),
-      persist: Object.fromEntries(Object.entries(startPersistent.vars).filter(([k, v]) => program.decls.vars[k] && v !== program.decls.vars[k].init)),
+      persist: Object.fromEntries(Object.entries(startPersistent.vars).filter(([k, v]) => { const d = lookup(program.decls.vars, k); return d && v !== d.init; })),
     };
     const better = (a, b) => a.pass !== b.pass ? a.pass < b.pass : a.path.length !== b.path.length ? a.path.length < b.path.length : a.words < b.words;
     if (!e.shortest || better(cand, e.shortest)) e.shortest = cand;
@@ -332,7 +347,7 @@ export function explore(program, opts = {}) {
             } else recordEnding('END', path, words, rollsNow(), pass, startPersistent);
           }
           const pk = persistentKey(vm.persistent);
-          if (!endStates.has(pk)) endStates.set(pk, clone(vm.persistent));
+          if (!endStates.has(pk)) endStates.set(pk, persistentCopy(vm.persistent));
           break;
         }
         if (h.type === 'menu' || h.type === 'game') { branchAt = h; break; }

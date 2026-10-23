@@ -6,7 +6,7 @@ import { createHost } from './host.js';
 import { prepareProject } from '../engine/core/compiler.js';
 import { VM } from '../engine/core/vm.js';
 import { defaultRegistry } from '../engine/core/modules/index.js';
-import { checkValue } from '../engine/core/registry.js';
+import { checkValue, has } from '../engine/core/registry.js';
 import { formatDiagnostic, summary, CODES, CODE_HELP } from '../engine/core/diagnostics.js';
 import { analyze, toMermaid, toDot, LENGTH_CATEGORIES } from '../engine/core/analyze.js';
 import { explore, formatPath, choiceList, replayArgs } from '../engine/core/explore.js';
@@ -51,7 +51,10 @@ Commands
              Add desc="..." to a declaration to keep the brief for the artist next to it.
   vndb       An advisory read of the game against VNDB's inclusion guidelines, plus a draft VNDB
              entry (release fields, length, tags, characters). VNDB's editors decide; this only
-             points out what they would look at.
+             points out what they would look at. It runs explore to find the endings players reach.
+               --no-explore         skip explore; count the endings declared with @ending
+               --max-states <n>     explore budget (default 250000)
+               --passes <n>         most playthroughs in a row for explore's replays (default 16)
   docs       Reference: shiori docs <command> (e.g. docs show), docs <topic> (choices, conditions,
              text, header, functions, positions, transitions, weather, filters, codes), or
              docs <cli-command> (e.g. docs play). No argument prints everything.
@@ -68,6 +71,14 @@ let host = null;
 let jsonMode = false;
 const out = (s = '') => host.print(s);
 
+// Tables keyed by names from the script or the command line (variables,
+// endings, scenes, characters, assets, attribute groups) have no prototype,
+// and lookups use own properties only, so `constructor` or `__proto__` is
+// just a name. Program tables are read with lookup(): a program read back
+// from JSON has tables with a prototype again.
+const table = () => Object.create(null);
+const lookup = (t, k) => has(t, k) ? t[k] : undefined;
+
 // ------------------------------------------------------------------ options
 
 // The options each command accepts. Boolean flags stand alone; value flags take
@@ -80,7 +91,7 @@ const OPTIONS = {
   graph: { value: ['format'] },
   stats: { bool: ['by-scene'] },
   assets: {},
-  vndb: { bool: ['no-explore'], value: ['max-states'] },
+  vndb: { bool: ['no-explore'], value: ['max-states', 'passes'] },
   docs: { value: ['game'] },
   explain: {},
   help: {},
@@ -92,7 +103,7 @@ const VALUE_HELP = {
   rolls: '--rolls 3,true,…', seed: '--seed <n>', max: '--max <n>', 'max-states': '--max-states <n>', format: '--format mermaid|dot|json',
   'game-result': '--game-result <result>', passes: '--passes <n>',
 };
-const valueHelp = (cmd, k) => cmd === 'docs' && k === 'game' ? '--game <folder>' : VALUE_HELP[k] || `--${k} <value>`;
+const valueHelp = (cmd, k) => cmd === 'docs' && k === 'game' ? '--game <folder>' : lookup(VALUE_HELP, k) || `--${k} <value>`;
 const wholeNumber = (v) => /^\d+$/.test(v) && Number(v) > 0 ? null : 'a whole number above 0';
 const VALUE_CHECKS = {
   max: wholeNumber,
@@ -111,7 +122,7 @@ export function parseArgs(args, cmdHint) {
   const o = { _: [] };
   // The command decides which options exist: it is the first word that is not an option.
   const cmd = cmdHint !== undefined ? cmdHint : args.find(a => !a.startsWith('-'));
-  const spec = OPTIONS[cmd];
+  const spec = lookup(OPTIONS, cmd);
   const bool = new Set(COMMON.concat(spec && spec.bool || []));
   const value = new Set(spec && spec.value || []);
   const known = [...bool, ...value];
@@ -137,10 +148,10 @@ export function parseArgs(args, cmdHint) {
       else if (i + 1 < args.length && !args[i + 1].startsWith('--')) v = args[++i];
       else return usageError(`\`--${k}\` needs a value.`, `Write \`${valueHelp(cmd, k)}\`.`);
       if (v === '') return usageError(`\`--${k}\` needs a value.`, `Write \`${valueHelp(cmd, k)}\`.`);
-      const bad = VALUE_CHECKS[k] && VALUE_CHECKS[k](v);
+      const bad = has(VALUE_CHECKS, k) && VALUE_CHECKS[k](v);
       if (bad) return usageError(`\`--${k} ${v}\` is not valid: ${k === 'format' ? 'use' : 'it takes'} ${bad}.`, `Write \`${valueHelp(cmd, k)}\`.`);
     } else {
-      const m = ALIASES[k] && known.includes(ALIASES[k]) ? ALIASES[k] : didYouMean(k, known);
+      const m = has(ALIASES, k) && known.includes(ALIASES[k]) ? ALIASES[k] : didYouMean(k, known);
       const elsewhere = Object.keys(OPTIONS).filter(c => c !== cmd && [...(OPTIONS[c].bool || []), ...(OPTIONS[c].value || [])].includes(k));
       const hint = m ? `Did you mean \`--${m}\`?` : elsewhere.length ? `\`--${k}\` is an option of \`shiori ${elsewhere.join('`, `shiori ')}\`.` : `Options for ${cmd}: ${known.map(x => '--' + x).join(' ')}.`;
       return usageError(`Unknown option \`--${k}\` for \`shiori ${cmd}\`.`, hint);
@@ -152,7 +163,7 @@ export function parseArgs(args, cmdHint) {
   if (spec && cmd !== 'help') {
     const extra = o._.slice(2);
     if (extra.length) {
-      const what = POSITIONAL[cmd] || 'game folder';
+      const what = lookup(POSITIONAL, cmd) || 'game folder';
       const x = extra[0];
       const hint = cmd === 'play' && /^\d+(,\d+)*$/.test(x) ? `Did you mean \`--choices ${x}\`?` : `\`shiori ${cmd}\` takes one ${what}; options start with --.`;
       return usageError(`Unexpected argument \`${x}\`.`, hint);
@@ -184,20 +195,21 @@ function fail(message, { hint, code, exit = 1, extra } = {}) {
 
 // --seen / --set as a starting persistent store (and plain variables for play).
 function startData(o, program, { forExplore = false } = {}) {
-  const persistent = { endings: {}, vars: {} };
-  const vars = {};
+  const persistent = { endings: table(), vars: table() };
+  const vars = table();
   const problems = [];
   if (o.seen) for (const raw of String(o.seen).split(',')) {
     const id = raw.trim();
     if (!id) continue;
-    if (!program.decls.endings[id]) { const m = didYouMean(id, Object.keys(program.decls.endings)); problems.push(`Unknown ending \`${id}\` in --seen.${m ? ` Did you mean \`${m}\`?` : ''}`); continue; }
-    persistent.endings[id] = { title: program.decls.endings[id].title, kind: program.decls.endings[id].kind, first: 0, count: 1 };
+    const e = lookup(program.decls.endings, id);
+    if (!e) { const m = didYouMean(id, Object.keys(program.decls.endings)); problems.push(`Unknown ending \`${id}\` in --seen.${m ? ` Did you mean \`${m}\`?` : ''}`); continue; }
+    persistent.endings[id] = { title: e.title, kind: e.kind, first: 0, count: 1 };
   }
   if (o.set) for (const kv of String(o.set).split(',')) {
     if (!kv.trim()) continue;
     const eq = kv.indexOf('=');
     const k = (eq < 0 ? kv : kv.slice(0, eq)).trim();
-    const d = program.decls.vars[k];
+    const d = lookup(program.decls.vars, k);
     if (!d) { const m = didYouMean(k, Object.keys(program.decls.vars)); problems.push(`Unknown variable \`${k}\` in --set.${m ? ` Did you mean \`${m}\`?` : ''}`); continue; }
     const example = d.type === 'number' ? '3' : d.type === 'bool' ? 'true' : 'text';
     if (eq < 0) { problems.push(`\`--set ${k}\` needs a value: --set ${k}=${example}`); continue; }
@@ -321,7 +333,7 @@ async function cmdCheck(o) {
   if (res.program && !res.diagnostics.some(d => d.severity === 'error')) {
     const a = analyze(res.program);
     for (const id of a.unreachableScenes) {
-      const s = res.program.scenes[id] || {};
+      const s = lookup(res.program.scenes, id) || {};
       res.diagnostics.push({ severity: 'warning', code: 'W600', message: `Scene \`${id}\` is never reached: no jump, choice or fall-through leads to it.`, file: s.file, line: s.line, hint: `Add \`-> ${id}\` (or a choice that leads to it) where it should happen, or delete the scene.` });
     }
     for (const r of a.staticRuns) res.diagnostics.push({ severity: 'warning', code: 'W616', message: `${r.length} lines in a row with no visual change (no expression, movement, camera or effect).`, file: r.loc && r.loc.file, line: r.loc && r.loc.line, hint: 'Readers notice static sprites. Change an expression (`mio (sad): ...`), move someone, or use @camera / @weather / @cg.' });
@@ -419,7 +431,7 @@ function parseRolls(raw, problems) {
 
 // --game id=result,… : a queue of results per gameplay id.
 function parseGames(raw, program, problems) {
-  const queue = {};
+  const queue = table();
   if (typeof raw !== 'string') return queue;
   const games = Object.values(program.decls.assets).filter(a => a.kind === 'gameplay');
   for (const kv of raw.split(',').map(s => s.trim()).filter(Boolean)) {
@@ -451,7 +463,7 @@ async function cmdPlay(o) {
   const { persistent, vars, problems } = startData(o, program);
   const rolls = parseRolls(o.rolls, problems);
   const gameQueue = parseGames(o.game, program, problems);
-  if (o.from && !program.labels[o.from]) {
+  if (o.from && lookup(program.labels, o.from) == null) {
     const m = didYouMean(o.from, program.sceneOrder);
     problems.push(`Unknown scene \`${o.from}\` in --from.${m ? ` Did you mean \`${m}\`?` : ''}`);
   }
@@ -541,7 +553,7 @@ async function cmdPlay(o) {
       continue;
     }
     if (h.type === 'end') {
-      const e = h.ending ? program.decls.endings[h.ending] : null;
+      const e = h.ending ? lookup(program.decls.endings, h.ending) : null;
       emit({ type: 'end', ending: h.ending }, `\n■ END${e ? ` — ending "${e.title}" (${e.kind})` : ''}`);
       stop = 'end';
       break;
@@ -695,7 +707,7 @@ async function cmdStats(o) {
   if (o['by-scene']) {
     out('');
     out('  Words per scene (narration / dialogue):');
-    const per = {};
+    const per = table();
     for (const ins of res.program.code) {
       if (ins.op !== 'say') continue;
       const p = per[ins.scene] = per[ins.scene] || { n: 0, d: 0, lines: 0 };
@@ -705,7 +717,7 @@ async function cmdStats(o) {
     }
     for (const id of res.program.sceneOrder) {
       const p = per[id] || { n: 0, d: 0, lines: 0 };
-      const sc = res.program.scenes[id];
+      const sc = lookup(res.program.scenes, id);
       out(`    ${(id + (sc.title ? ' "' + sc.title + '"' : '')).slice(0, 44).padEnd(44)} ${String(Math.round(p.n + p.d)).padStart(6)} words  (${Math.round(p.n)} / ${Math.round(p.d)})  ${sc.file}:${sc.line}`);
     }
   }
@@ -721,24 +733,24 @@ async function cmdAssets(o) {
   const p = res.program, decls = p.decls;
   const join = (x) => res.base === '.' ? x : res.base + '/' + x;
   // Where is each asset used, and under which filter / weather / tint?
-  const uses = {}, charUse = {};
+  const uses = table(), charUse = table();
   let ctx = { filter: null, weather: null, tint: null };
   const use = (id, as, ins) => { (uses[id] = uses[id] || []).push({ as, scene: ins.scene, line: ins.loc && ins.loc.line, file: ins.loc && ins.loc.file, ...ctx }); };
   for (const ins of p.code) {
     if (ins.op === 'scene') ctx = { filter: null, weather: null, tint: null };
     if (ins.op === 'say' && ins.who) {
-      const c = charUse[ins.who] = charUse[ins.who] || { attrs: {}, scenes: new Set() };
+      const c = charUse[ins.who] = charUse[ins.who] || { attrs: table(), scenes: new Set() };
       c.scenes.add(ins.scene);
       for (const [g, v] of Object.entries(ins.attrs || {})) (c.attrs[g] = c.attrs[g] || new Set()).add(v);
     }
     if (ins.op !== 'cmd') continue;
     const a = ins.args;
     switch (ins.name) {
-      case 'scene': ctx = { filter: null, weather: null, tint: null }; if (a.bg && decls.assets[a.bg]) use(a.bg, 'background', ins); break;
-      case 'bg': if (a.bg && decls.assets[a.bg]) use(a.bg, 'background', ins); break;
+      case 'scene': ctx = { filter: null, weather: null, tint: null }; if (a.bg && has(decls.assets, a.bg)) use(a.bg, 'background', ins); break;
+      case 'bg': if (a.bg && has(decls.assets, a.bg)) use(a.bg, 'background', ins); break;
       case 'cg': if (a.image) use(a.image, 'CG', ins); break;
       case 'show':
-        if (a.kind === 'character') { const c = charUse[a.who] = charUse[a.who] || { attrs: {}, scenes: new Set() }; c.scenes.add(ins.scene); for (const [g, v] of Object.entries(a.attrs || {})) (c.attrs[g] = c.attrs[g] || new Set()).add(v); }
+        if (a.kind === 'character') { const c = charUse[a.who] = charUse[a.who] || { attrs: table(), scenes: new Set() }; c.scenes.add(ins.scene); for (const [g, v] of Object.entries(a.attrs || {})) (c.attrs[g] = c.attrs[g] || new Set()).add(v); }
         else use(a.who, 'prop', ins);
         break;
       case 'music': if (a.track !== 'stop') use(a.track, 'music', ins); break;
@@ -758,9 +770,12 @@ async function cmdAssets(o) {
     report.assets.push({ id: a.id, kind: a.kind, path: a.path, exists: remote || isInline(a.path) || host.exists(join(a.path)), ...(remote ? { remote: true } : {}), desc: a.opts.desc || a.opts.title || null, uses: uses[a.id] || [] });
   }
   for (const c of Object.values(decls.characters)) {
-    const u = charUse[c.id] || { attrs: {}, scenes: new Set() };
-    const groups = {};
-    for (const [g, vals] of Object.entries(c.groups)) groups[g] = { declared: vals, used: vals.filter(v => (u.attrs[g] && u.attrs[g].has(v)) || c.defaults[g] === v), unused: vals.filter(v => !((u.attrs[g] && u.attrs[g].has(v)) || c.defaults[g] === v)) };
+    const u = charUse[c.id] || { attrs: table(), scenes: new Set() };
+    const groups = table();
+    for (const [g, vals] of Object.entries(c.groups)) {
+      const used = (v) => (u.attrs[g] && u.attrs[g].has(v)) || lookup(c.defaults, g) === v;
+      groups[g] = { declared: vals, used: vals.filter(used), unused: vals.filter(v => !used(v)) };
+    }
     report.characters.push({ id: c.id, name: c.name, sprite: c.sprite || (c.layers.length ? c.layers : null), model: c.model, blink: c.blink, mouth: c.mouth, groups, scenes: [...u.scenes], description: c.vndb.description || null });
   }
   if (o.json) { out(JSON.stringify(report, null, 2)); return; }
@@ -796,7 +811,7 @@ async function cmdVndb(o) {
   const res = await load(o._[0] || '.', { skipAssets: true });
   if (failIfErrors(res, o.json)) return;
   const a = analyze(res.program);
-  const ex = o['no-explore'] ? null : explore(res.program, { registry: res.registry, maxStates: o['max-states'] ? Number(o['max-states']) : undefined });
+  const ex = o['no-explore'] ? null : explore(res.program, { registry: res.registry, maxStates: o['max-states'] ? Number(o['max-states']) : undefined, passes: o.passes ? Number(o.passes) : undefined });
   const r = vndbReport(res.program, { analysis: a, exploration: ex });
   if (o.json) out(JSON.stringify(r, null, 2));
   else out(formatVndb(r));
@@ -821,7 +836,7 @@ const CLI_HELP = {
   graph: 'shiori graph <folder> [--format mermaid|dot|json]\n  The scene graph: jumps, calls, choices and fall-through between scenes; endings are marked.',
   stats: 'shiori stats <folder> [--by-scene] [--json]\n  Words, reading time and VNDB length category, narration share, lines per speaker, unreachable scenes and @note notes; --by-scene adds a per-scene word table.',
   assets: 'shiori assets <folder> [--json]\n  Every declared file: exists?, where it is used (with filter/weather/tint), and which expressions each character actually uses.',
-  vndb: 'shiori vndb <folder> [--no-explore] [--max-states n] [--json]\n  Advisory read against VNDB\'s guidelines plus a draft entry. Never fails the command: VNDB\'s editors and the author decide.',
+  vndb: 'shiori vndb <folder> [--no-explore] [--max-states n] [--passes n] [--json]\n  Advisory read against VNDB\'s guidelines plus a draft entry. It runs explore to count the endings players reach: --max-states and --passes work as in `shiori explore`, and --no-explore counts the declared endings instead. Never fails the command: VNDB\'s editors and the author decide.',
   new: 'shiori new <folder>\n  Copy the starter game into a new folder (inside the engine folder if you want `shiori serve`).',
   serve: 'shiori serve [folder]\n  Serve the engine folder on localhost:8777 (PORT=… to change) and print the URL of the game (with &dev=1). The folder defaults to the current one when it holds game.story.',
   explain: 'shiori explain <CODE>\n  What a diagnostic code means and how to fix it.',
@@ -841,7 +856,7 @@ async function cmdDocs(o) {
   }
   const extra = moduleErrors.length ? { diagnostics: moduleErrors } : {};
   const name = o._[0];
-  if (name && TOPICS[name]) {
+  if (name && has(TOPICS, name)) {
     const [title, text] = TOPICS[name];
     let body = text;
     if (!body) {
@@ -854,7 +869,7 @@ async function cmdDocs(o) {
     out(JSON.stringify({ topic: name, title, text: body }, null, 2));
     return;
   }
-  if (name && CLI_HELP[name] && !reg.get(name)) { out(o.json ? JSON.stringify({ command: name, help: CLI_HELP[name] }, null, 2) : CLI_HELP[name]); return; }
+  if (name && has(CLI_HELP, name) && !reg.get(name)) { out(o.json ? JSON.stringify({ command: name, help: CLI_HELP[name] }, null, 2) : CLI_HELP[name]); return; }
   if (name) {
     const c = reg.get(name.replace(/^@/, ''));
     if (!c) {
@@ -879,13 +894,14 @@ async function cmdDocs(o) {
 function cmdExplain(o) {
   const code = (o._[0] || '').toUpperCase();
   if (!code) return fail('Which code? For example: shiori explain E113', { hint: `Codes: ${Object.keys(CODES).join(' ')}`, exit: 2 });
-  if (!CODES[code]) {
+  if (!has(CODES, code)) {
     const m = didYouMean(code, Object.keys(CODES));
     return fail(`Unknown code ${code}.${m ? ` Did you mean ${m}?` : ''}`, { hint: `Codes: ${Object.keys(CODES).join(' ')}` });
   }
-  if (o.json) { out(JSON.stringify({ code, title: CODES[code], help: CODE_HELP[code] || null }, null, 2)); return; }
+  const help = lookup(CODE_HELP, code) || null;
+  if (o.json) { out(JSON.stringify({ code, title: CODES[code], help }, null, 2)); return; }
   out(`${code}: ${CODES[code]}`);
-  if (CODE_HELP[code]) out('\n' + CODE_HELP[code]);
+  if (help) out('\n' + help);
 }
 
 // ------------------------------------------------------------------- main
@@ -894,7 +910,7 @@ const COMMANDS = { assets: cmdAssets, check: cmdCheck, play: cmdPlay, explore: c
 
 async function main(args) {
   const cmd = args.find(a => !a.startsWith('-'));
-  if (cmd && !COMMANDS[cmd] && cmd !== 'help') {
+  if (cmd && !has(COMMANDS, cmd) && cmd !== 'help') {
     const m = didYouMean(cmd, Object.keys(COMMANDS).concat('new', 'serve', 'build', 'selftest'));
     if (jsonMode) return fail(`Unknown command \`${cmd}\`.`, { hint: m ? `Did you mean \`${m}\`?` : 'Run `shiori help` for the commands.', exit: 2 });
     out(`Unknown command \`${cmd}\`.${m ? ` Did you mean \`${m}\`?` : ''}\n`);
