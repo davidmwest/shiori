@@ -39,11 +39,16 @@ for c in "${CODEX_BIN:-}" /Applications/ChatGPT.app/Contents/Resources/codex-cli
   if [ -n "$c" ] && [ -x "$c" ]; then CODEX="$c"; break; fi
 done
 [ -n "$CODEX" ] || { echo "codex CLI not found"; echo "exit=127" > "$WD/$TASK.done"; exit 1; }
-[ -f "$PROMPT" ] || { echo "no prompt file $PROMPT"; echo "exit=2" > "$WD/$TASK.done"; exit 1; }
+[ -n "$CMD" ] || [ -f "$PROMPT" ] || { echo "no prompt file $PROMPT"; echo "exit=2" > "$WD/$TASK.done"; exit 1; }
 
 git -C "$ROOT" fetch -q origin || { echo "fetch failed"; echo "exit=1" > "$WD/$TASK.done"; exit 1; }
 if [ ! -d "$W" ]; then
-  git -C "$ROOT" worktree add -q "$W" -b "codex/$TASK" "origin/$BASE" || { echo "worktree add failed"; echo "exit=1" > "$WD/$TASK.done"; exit 1; }
+  # A rerun reuses the task's branch, so earlier results are kept and built on.
+  if git -C "$ROOT" rev-parse -q --verify "refs/heads/codex/$TASK" >/dev/null; then
+    git -C "$ROOT" worktree add -q "$W" "codex/$TASK"
+  else
+    git -C "$ROOT" worktree add -q "$W" -b "codex/$TASK" "origin/$BASE"
+  fi || { echo "worktree add failed"; echo "exit=1" > "$WD/$TASK.done"; exit 1; }
 fi
 
 if [ -n "$CMD" ]; then
@@ -59,7 +64,10 @@ echo "codex exit $status"
 cd "$W" || exit 1
 if [ $# -gt 0 ]; then git add -A -- "$@"; else git add -A; fi
 cp "$WD/$TASK.last.md" ".codex-last-message.md" 2>/dev/null && git add -f .codex-last-message.md
-if git commit -q -m "Codex worker $TASK ($MODEL, effort $EFFORT)"; then echo "committed"; else echo "nothing to commit"; fi
+if git diff --cached --quiet; then commit=none
+elif git commit -q -m "Codex worker $TASK ($MODEL, effort $EFFORT)"; then commit=ok
+else commit=failed; fi
+echo "commit $commit"
 if git push -q -u origin "codex/$TASK"; then push=ok; else push=failed; fi
 echo "push $push"
-echo "exit=$status push=$push" > "$WD/$TASK.done"
+echo "exit=$status commit=$commit push=$push" > "$WD/$TASK.done"
