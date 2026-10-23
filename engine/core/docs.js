@@ -1,7 +1,7 @@
 // Generates the command reference from the registry, so the documentation
 // always matches the engine (including commands added by your own modules).
 
-import { TRANSITIONS, EASES, POSITIONS } from './registry.js';
+import { TRANSITIONS, EASES, POSITIONS, has } from './registry.js';
 import { TAGS } from './markup.js';
 import { FUNCTIONS } from './expr.js';
 import { HEADER_FIELDS } from './header.js';
@@ -54,10 +54,12 @@ export function commandDoc(c) {
 
 export function commandReference(registry) {
   const out = [];
-  const byModule = {};
-  for (const c of registry.commands.values()) (byModule[c.module] = byModule[c.module] || []).push(c);
-  for (const [mod, list] of Object.entries(byModule)) {
-    out.push(`## ${MODULE_TITLES[mod] || 'Module: ' + mod}`);
+  // Module names come from the game's own modules too: a Map, so a module
+  // called `constructor` is just a name.
+  const byModule = new Map();
+  for (const c of registry.commands.values()) { if (!byModule.has(c.module)) byModule.set(c.module, []); byModule.get(c.module).push(c); }
+  for (const [mod, list] of byModule) {
+    out.push(`## ${has(MODULE_TITLES, mod) ? MODULE_TITLES[mod] : 'Module: ' + mod}`);
     out.push('');
     for (const c of list) { out.push(commandDoc(c)); out.push(''); }
   }

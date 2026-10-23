@@ -4,6 +4,14 @@
 import { plainText } from './markup.js';
 import { collectRefs } from './expr.js';
 import { wordWeight } from './util.js';
+import { has } from './registry.js';
+
+// Tables keyed by names from the script (characters, scenes) have no
+// prototype, so a character called `constructor` is just a name. Program
+// tables are read with lookup(): a program read back from JSON has tables
+// with a prototype again.
+const table = () => Object.create(null);
+const lookup = (t, k) => has(t, k) ? t[k] : undefined;
 
 export const LENGTH_CATEGORIES = [
   { id: 1, name: 'Very short', max: 2, doc: '< 2 hours' },
@@ -93,7 +101,7 @@ export function liveness(program) {
 
 export function reachable(program) {
   const seen = new Uint8Array(program.code.length + 1);
-  const start = program.labels[program.start];
+  const start = lookup(program.labels, program.start);
   if (start == null) return seen;
   const stack = [start];
   while (stack.length) {
@@ -174,20 +182,20 @@ function exitsFrom(program, sceneOf, pc) {
 // an @if whose other side runs into the next scene).
 export function storyGraph(program) {
   const code = program.code;
-  const nodes = program.sceneOrder.map(id => ({ id, title: program.scenes[id].title, file: program.scenes[id].file, line: program.scenes[id].line, endings: [], words: 0 }));
-  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const nodes = program.sceneOrder.map(id => { const s = lookup(program.scenes, id); return { id, title: s.title, file: s.file, line: s.line, endings: [], words: 0 }; });
+  const byId = new Map(nodes.map(n => [n.id, n]));
   const sceneOf = sceneOfPc(program);
   const edges = [];
   code.forEach((ins, pc) => {
     const from = sceneOf[pc];
-    if (!from || !byId[from]) return;
+    if (!from || !byId.has(from)) return;
     const add = (to, kind, label) => {
       if (to === 'END') { edges.push({ from, to: 'END', kind, label }); return; }
       const target = typeof to === 'number' ? sceneOf[to] : null;
-      if (target && target !== from && byId[target]) edges.push({ from, to: target, kind, label });
+      if (target && target !== from && byId.has(target)) edges.push({ from, to: target, kind, label });
     };
-    if (ins.op === 'say') byId[from].words += wordsOf(ins);
-    if (ins.op === 'cmd' && ins.name === 'ending') byId[from].endings.push(ins.args.id);
+    if (ins.op === 'say') byId.get(from).words += wordsOf(ins);
+    if (ins.op === 'cmd' && ins.name === 'ending') byId.get(from).endings.push(ins.args.id);
     switch (ins.op) {
       case 'jump': if (ins.pc != null) add(ins.pc, 'jump'); break;
       case 'call': if (ins.pc != null) add(ins.pc, 'call'); break;
@@ -263,7 +271,7 @@ function readingRuns(program, reach, sceneOf) {
   const inD =new Int32Array(N).fill(-1), inDs = new Int32Array(N), inS = new Int32Array(N).fill(-1), inSs = new Int32Array(N);
   const inM = new Uint8Array(N); // modes that can be active: 1 = adv, 2 = nvl
   const seed = (pc) => { if (pc == null || pc < 0 || pc >= N) return; if (inD[pc] < 0) { inD[pc] = 0; inDs[pc] = pc; } if (inS[pc] < 0) { inS[pc] = 0; inSs[pc] = pc; } inM[pc] |= 1; };
-  seed(program.labels[program.start]);
+  seed(lookup(program.labels, program.start));
   code.forEach((ins, pc) => { if (ins.op === 'scene' && !reach[pc]) seed(pc); });
 
   const isNarration = (ins) => !ins.who && !ins.name;
@@ -373,7 +381,7 @@ export function analyze(program) {
   const sceneOf = sceneOfPc(program);
   const header = program.header;
   const wpm = header.reading_speed || 200;
-  const perChar = {};
+  const perChar = table();
   let words = 0, narrationWords = 0, dialogueWords = 0, lines = 0, narrationLines = 0, reachableWords = 0;
   let menus = 0, options = 0, inputs = 0, games = [], gameMinutes = 0, videos = [], voiced = 0, dialogueLines = 0;
   let nvlLines = 0, advLines = 0, mode = 'adv';
@@ -398,7 +406,7 @@ export function analyze(program) {
       if (ins.name === 'voice') pendingVoice = true;
       if (ins.name === 'input') { inputs++; gaps.push(sinceInteraction); sinceInteraction = 0; }
       if (ins.name === 'game') {
-        const a = program.decls.assets[ins.args.id];
+        const a = lookup(program.decls.assets, ins.args.id);
         const m = a && a.opts.minutes != null ? a.opts.minutes : 1;
         games.push({ id: ins.args.id, minutes: m, reachable: isReach, loc: ins.loc });
         if (isReach) gameMinutes += m;
@@ -424,7 +432,7 @@ export function analyze(program) {
     } else {
       dialogueWords += w; dialogueLines++;
       const k = ins.who || ins.name;
-      perChar[k] = perChar[k] || { lines: 0, words: 0, voiced: 0, name: ins.who ? program.decls.characters[ins.who].name : ins.name };
+      perChar[k] = perChar[k] || { lines: 0, words: 0, voiced: 0, name: ins.who ? lookup(program.decls.characters, ins.who).name : ins.name };
       perChar[k].lines++; perChar[k].words += w;
       if (pendingVoice) { voiced++; perChar[k].voiced++; }
     }
@@ -434,18 +442,21 @@ export function analyze(program) {
   const { dialogueRuns, staticRuns, maxDialogueRun } = readingRuns(program, reach, sceneOf);
   for (const r of conditionRefs) {
     for (const c of r.calls) if (c.name === 'ending_seen' || c.name === 'endings_seen') usesPersistentConditions.ending_seen = true;
-    for (const v of r.vars) { const d = program.decls.vars[v.name]; if (d && d.persistent) usesPersistentConditions.persistent = true; }
+    for (const v of r.vars) { const d = lookup(program.decls.vars, v.name); if (d && d.persistent) usesPersistentConditions.persistent = true; }
   }
   const sorted = gaps.slice().sort((a, b) => a - b);
   const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
   const readingMinutes = reachableWords / wpm;
   const endings = Object.values(program.decls.endings);
   const graph = storyGraph(program);
+  // Most words first.
+  const perCharacter = table();
+  for (const [k, v] of Object.entries(perChar).sort((a, b) => b[1].words - a[1].words)) perCharacter[k] = { ...v, words: Math.round(v.words) };
   return {
     words: Math.round(words), reachableWords: Math.round(reachableWords), lines, narrationLines, dialogueLines,
     narrationShare: words ? narrationWords / words : 0,
     narrationLineShare: lines ? narrationLines / lines : 0,
-    perCharacter: Object.fromEntries(Object.entries(perChar).sort((a, b) => b[1].words - a[1].words).map(([k, v]) => [k, { ...v, words: Math.round(v.words) }])),
+    perCharacter,
     scenes: program.sceneOrder.length, unreachableScenes,
     menus, options, inputs, games, gameMinutes, videos,
     endings: endings.map(e => ({ id: e.id, title: e.title, kind: e.kind, scene: e.scene })),
@@ -469,7 +480,7 @@ export function toMermaid(graph, program) {
   const out = ['flowchart TD'];
   const start = program.start;
   for (const n of graph.nodes) {
-    const label = esc(n.title ? `${n.id}: ${n.title}` : n.id) + (n.endings.length ? ' ★ ' + n.endings.map(e => esc(program.decls.endings[e] ? program.decls.endings[e].title : e)).join(', ') : '');
+    const label = esc(n.title ? `${n.id}: ${n.title}` : n.id) + (n.endings.length ? ' ★ ' + n.endings.map(e => { const d = lookup(program.decls.endings, e); return esc(d ? d.title : e); }).join(', ') : '');
     out.push(`  ${id(n.id)}${n.endings.length ? '(["' + label + '"])' : '["' + label + '"]'}`);
   }
   out.push('  END_((END))');
