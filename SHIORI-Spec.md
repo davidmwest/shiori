@@ -280,7 +280,7 @@ A line like `Old Man: Who goes there?` (capitalised words before a colon) is sho
 
 W608 also flags other lines that look like dialogue but will be shown as narration: `mio：…` (a full-width colon), `mio:Hi` (no space after the colon), `“Ferryman”: …` (curly quotes), Ren'Py's `mio "Hi"` (any one word, `Élodie "Bonjour."` too), and a short Chinese, Japanese, Korean or Thai name before the colon (`ミオ: …`). Ordinary prose has the first two shapes too, so they get W608 only when the word is a lowercase id (`mio`), the id or display name of a character declared in the same file (`Mio:Hi`, `Élodie:Bonjour.`), or, before `：`, a name written in kana (`ミオ：…`). `Note:the tide is in.`, `Re:Zero`, `C:\Windows` and `時刻：午後三時。` stay plain narration. The hint gives the line with the character's id.
 
-**Point of view.** `@pov rin` marks the following narration as seen through Rin's eyes; the player shows her current name (after any `@rename`) and color on narration, and the backlog records it. `@pov none` clears it. It lasts until changed — `@scene` does not reset it. Use it when the narrator changes (Part 3.3).
+**Point of view.** `@pov rin` marks the following narration as seen through Rin's eyes; the player shows her current name (after any `@rename`) and color on narration, and the backlog records it. In ADV mode the name sits above the textbox on every such line. In NVL mode each such paragraph gets a bar in her color, and the first paragraph of each run of them shows her name too (again after dialogue, other narration, a new POV, a `@rename` or a new page). `@pov none` clears it. It lasts until changed — `@scene` does not reset it. Use it when the narrator changes (Part 3.3).
 
 **Each line is one click.** Long paragraphs are fine in NVL mode; in ADV mode keep a line to what fits the textbox (about 3 lines, ~250 characters). `shiori check` warns about ADV lines over 280 characters (W619) and any line over 600 (W607).
 
@@ -433,6 +433,7 @@ Declarations are compile-time: they apply to the whole game wherever they appear
   ```
 
 - `blink:` — an overlay drawn for a moment every few seconds (eyes closed). `mouth:` — an overlay toggled while the character's line is typing (mouth open). Both are optional. `sprite:`, `layer:`, `side:`, `blink:` and `mouth:` all accept `{group}` placeholders.
+- `noblink:` lists attribute values whose art already has the eyes closed: `noblink: sleepy proud`. The blink overlay is not drawn while the character has any of them. Each value must be one of the character's attribute values (E203), and the character needs a `blink:` line (E303).
 - `side:` — a side portrait shown next to the textbox when the character speaks.
 - `model:` — a 3D model for 3D worlds (`.glb`, `.gltf`, `.vrm`, or a `.js` module; 2.11). A character may have both a sprite and a model; the stage picks the right one.
 - `scale:`, `y:` — size and vertical offset of the sprite.

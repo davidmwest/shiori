@@ -442,7 +442,7 @@ const paragraphs = (ui) => ui.nvlPage.children.map(p => [p.className, p.textCont
 const PAGE = [
   ['sh-nvl-p', 'The 風かぜ rises.Night.'],
   ['sh-nvl-p sh-nvl-dialogue', 'Mio「Hello there.」'],
-  ['sh-nvl-p sh-nvl-pov', 'I watched the lamp.'],
+  ['sh-nvl-p sh-nvl-pov', 'RinI watched the lamp.'],
 ];
 
 test('restoring an NVL page shows its three paragraphs, with the speaker and the POV', () => withGlobals(domGlobals(), () => {
@@ -457,7 +457,7 @@ test('restoring an NVL page shows its three paragraphs, with the speaker and the
   ok(all(p1).some(n => n.tagName === 'rt') && all(p1).some(n => n.tagName === 'br'), 'ruby and br restored');
   eq([p2.children[0].className, p2.children[0].textContent, p2.children[0].style.color], ['sh-nvl-name', 'Mio', '#f68']);
   eq(p3.style['--pov'], '#8af', 'the POV character\'s colour');
-  eq(p3.children.map(c => c.className), ['sh-nvl-text'], 'narration has no name');
+  eq(p3.children.map(c => [c.className, c.textContent]), [['sh-nvl-povname', 'Rin'], ['sh-nvl-text', 'I watched the lamp.']], 'the first POV paragraph shows the POV name');
   const letters = all(ui.nvlPage).filter(n => n.classes.has('sh-ch'));
   ok(letters.length > 30 && letters.every(n => n.classes.has('on')), 'every restored letter is visible');
 }));

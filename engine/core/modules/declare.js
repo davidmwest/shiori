@@ -57,12 +57,15 @@ function templateGroups(tpl) {
 function declareCharacter(cmd, ctx, args) {
   const id = args.pos.id;
   if (!id) return;
-  const c = { id, name: null, color: null, sprite: null, layers: [], side: null, blink: null, mouth: null, model: null, scale: 1, y: 0, groups: Object.create(null), attrIndex: Object.create(null), defaults: Object.create(null), vndb: {} };
+  const c = { id, name: null, color: null, sprite: null, layers: [], side: null, blink: null, mouth: null, model: null, scale: 1, y: 0, groups: Object.create(null), attrIndex: Object.create(null), defaults: Object.create(null), noblink: [], vndb: {} };
   const entries = [];
   for (const a of cmd.args.slice(1)) entries.push({ key: a.key, value: a.value, loc: { ...cmd.loc, col: a.col }, positional: !a.key });
   for (const p of cmd.props) entries.push({ key: p.key, value: p.value, loc: p.loc });
+  const noblink = [];
   for (const e of entries) {
     if (e.positional) continue; // reported by bindArgs
+    // `noblink: sleepy proud`: checked once every attribute group is known.
+    if (e.key === 'noblink') { noblink.push(e); continue; }
     const type = has(CHAR_PROPS, e.key) ? CHAR_PROPS[e.key] : null;
     if (e.key === 'gender') e.value = ({ f: 'female', m: 'male', nb: 'nonbinary', n: 'nonbinary', x: 'nonbinary', '?': 'unknown' })[String(e.value).toLowerCase()] || e.value;
     if (type) {
@@ -84,7 +87,7 @@ function declareCharacter(cmd, ctx, args) {
     // property (`nmae: Mio Tanaka`, `descripton: The quiet ...`). Real groups
     // near a property name (`pose:` vs role, `size:` vs side) stay groups.
     if (!templateHasGroup(c, e.key, entries)) {
-      const m = didYouMean(e.key, Object.keys(CHAR_PROPS));
+      const m = didYouMean(e.key, [...Object.keys(CHAR_PROPS), 'noblink']);
       if (m && (values.length === 1 || TEXT_PROPS.includes(m) || values.some(v => !isIdent(v)))) {
         ctx.diags.error('E302', `\`@character\` has no property \`${e.key}\`.`, e.loc, `Did you mean \`${m}\`?`); continue;
       }
@@ -101,7 +104,26 @@ function declareCharacter(cmd, ctx, args) {
   for (const key of ['sprite', 'side', 'blink', 'mouth']) checkTemplate(c, c[key], key, cmd, ctx);
   c.layers.forEach(l => checkTemplate(c, l, 'layer', cmd, ctx));
   if (c.sprite && c.layers.length) ctx.diags.error('E303', 'Use either `sprite:` (one image per look) or `layer:` lines (stacked images), not both.', cmd.loc);
+  for (const e of noblink) checkNoblink(c, e, ctx);
   ctx.addCharacter(c, cmd.loc);
+}
+
+// `noblink:` lists attribute values whose art already has the eyes closed: the
+// blink overlay is not drawn while the character has one of them.
+function checkNoblink(c, e, ctx) {
+  const values = String(e.value == null ? '' : e.value).split(/[\s,]+/).filter(Boolean);
+  if (!values.length) { ctx.diags.error('E303', '`noblink:` lists no attribute values.', e.loc, 'List the values whose art has the eyes closed, e.g. `noblink: sleepy`.'); return; }
+  if (!c.blink) {
+    ctx.diags.error('E303', `\`noblink:\` only works with a \`blink:\` overlay, and \`${c.id}\` has none.`, e.loc, 'Add a `blink:` line (e.g. `blink: chars/' + c.id + '/blink.png`), or remove `noblink:`.');
+    return;
+  }
+  const all = Object.keys(c.attrIndex);
+  for (const v of values) {
+    if (has(c.attrIndex, v)) { if (!c.noblink.includes(v)) c.noblink.push(v); continue; }
+    const m = didYouMean(v, all);
+    ctx.diags.error('E203', all.length ? `\`noblink:\`: \`${c.id}\` has no attribute \`${v}\`.` : `\`noblink:\`: \`${c.id}\` has no attributes declared, so \`${v}\` can't be used.`, e.loc,
+      m ? `Did you mean \`${m}\`?` : all.length ? `${c.id}'s attributes: ${Object.entries(c.groups).map(([g, vs]) => g + ': ' + vs.join(' ')).join('; ')}.` : `Add a line like \`expression: neutral sleepy\` under \`@character ${c.id}\`.`);
+  }
 }
 
 function templateHasGroup(c, key, entries) {
