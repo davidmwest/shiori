@@ -1,0 +1,111 @@
+LMN 1
+title: The Lantern Keeper
+artist: Shiori examples
+tempo: 88
+time: 3/4
+key: D major
+mood: gentle, nostalgic; a harbor at dusk
+
+// ---------------------------------------------------------------------------
+// MIO'S THEME (the leitmotif of all three songs)
+//   A pentatonic waltz tune built on one gesture: a rising sixth, A4 -> F#5,
+//   "the beam going out", that sighs down a step, then the turn 3. 5 6 | 5.
+//
+//     A4 | F#5 - E5 | F#5. A5 B5 | A5 - - | . B5 A5 | F#5 - E5 | D5. E5 F#5 | E5 - - |
+//
+//   The first half ends on E (open, waiting); the second half climbs to D6,
+//   the highest and brightest note, then comes home.
+//
+// FORM  48 bars of 3/4 at 88 = 1:38; the Outro cadences on D and the Intro
+//       starts again on D, so the loop is seamless.
+//   Intro   4  music box states the head of the theme, harp underneath
+//   A1     16  flute melody, harp arpeggios, three-voice strings, cello bass
+//   B       8  oboe answers with a rising line; the flat seventh (Cmaj7) gives
+//              the harbor its folk colour; bass walks down G F# E | C B A G | A
+//   A2     16  flute again, oboe counter-line (parallel sixths and thirds),
+//              harp sweep into the climax, strings swell to mf
+//   Outro   4  music box echoes the tail of the tune and closes on D
+//
+// HARMONY
+//   A:  D | Bm7 | Gmaj7 | A7sus4 A | F#m7 | Bm7 | Em7 | A7sus4 A7 |
+//       D | Bm7 Bm7/A | Gmaj7 | F#m7 | Em7 | D/A | A7 | D |
+//   B:  Gmaj7 | D/F# | Em7 | Cmaj7 | G/B | Am7 | Gmaj7 | A7sus4 A7 |
+//
+// Strings are written as three voices (s1 top, s2, s3) so common tones are
+// held with ties instead of re-bowed.
+// ---------------------------------------------------------------------------
+
+track flute    flute       vol=84 pan=-6  reverb=35
+track oboe     oboe        vol=68 pan=16  reverb=35
+track mbox     music_box   vol=68 pan=22  reverb=50
+track harp     harp        vol=52 pan=-24 reverb=40
+track strings  strings     vol=52 pan=6   reverb=45
+track cello    cello       vol=58 pan=14  reverb=35
+
+section Intro bars=4
+mbox        | !mf F#6h E6q | F#6q. A6e B6q | A6h. | rq B6q A6q |
+harp        | !p D2e A2e D3e F#3e A3e F#3e | B1e F#2e B2e D3e A3e D3e | G1e D2e B2e F#3e A3e F#3e | A1e E2e A2e D3e C#3e E3e |
+strings.s1  | R | R | !pp D4h.~ | D4h C#4q |
+strings.s2  | R | R | !pp B3h. | A3h. |
+strings.s3  | R | R | !pp F#3h. | G3h. |
+flute       | R | R | R | rh !mp A4q |
+
+section A1 bars=16
+// bars 1-8: the question, ending on E
+flute       | !mp F#5h E5q | F#5q. A5e B5q | A5h. | rq B5q A5q | F#5h E5q | D5q. E5e F#5q | E5h. | E5h A4q |
+harp        | !p D2e A2e D3e F#3e A3e F#3e | B1e F#2e B2e D3e A3e D3e | G1e D2e B2e F#3e A3e F#3e | A1e E2e A2e D3e C#3e E3e |
+harp        | F#1e C#2e A2e C#3e E3e C#3e | B1e F#2e B2e D3e A3e D3e | E2e B2e D3e G3e B3e G3e | A1e E2e A2e D3e C#3e G3e |
+strings.s1  | !pp D4h.~ | D4h.~ | D4h.~ | D4h C#4q~ | C#4h. | D4h.~ | D4h.~ | D4h C#4q |
+strings.s2  | !pp A3h.~ | A3h. | B3h. | A3h.~ | A3h.~ | A3h. | B3h. | A3h. |
+strings.s3  | !pp F#3h.~ | F#3h.~ | F#3h. | G3h. | E3h. | F#3h. | G3h.~ | G3h. |
+cello       | !p D3h. | B2h. | G2h. | A2h. | F#2h. | B2h. | E2h. | A2h. |
+// bars 9-16: the answer, up to D6 and home
+flute       | !mf F#5h E5q | F#5q. A5e B5q | D6h. | C#6q B5q A5q | B5h A5q | !mp F#5q. E5e D5q | E5h. | D5h. |
+harp        | !mp D2e A2e D3e F#3e A3e F#3e | B1e F#2e B2e D3e A1e F#3e | G1e D2e B2e F#3e A3e D4e | F#1e C#2e A2e C#3e E3e A3e |
+harp        | !p E2e B2e D3e G3e B3e G3e | A1e A2e D3e F#3e A3e F#3e | A1e E2e G2e C#3e E3e C#3e | D2e A2e D3e F#3e A3e D4e |
+strings.s1  | !p D4h.~ | D4h. | !mp F#4h. | E4h.~ | !p E4h. | D4h. | C#4h. | !pp D4h. |
+strings.s2  | !p A3h. | B3h A3q | !mp B3h. | C#4h. | !p B3h. | A3h.~ | A3h.~ | !pp A3h. |
+strings.s3  | !p F#3h.~ | F#3h. | !mp G3h. | A3h. | !p G3h. | F#3h. | G3h. | !pp F#3h. |
+cello       | !mp D3h. | B2h A2q | G2h. | F#2h. | !p E2h. | A2h.~ | A2h. | D2h. |
+
+section B bars=8
+// the oboe's rising answer; the flute only returns for the pickup
+oboe        | !mf B4q. D5e E5q | D5h. | E5q. G5e A5q | G5h. | B5h A5q | G5q F#5q E5q | !mp F#5h. | E5h rq |
+flute       | R | R | R | R | R | R | R | rh !mp A4q |
+harp        | !p G1q. B2e D3e F#3e | F#1q. A2e D3e F#3e | E2q. B2e D3e G3e | C2q. G2e B2e E3e |
+harp        | B1q. G2e B2e D3e | A1q. E2e G2e C3e | G1q. B2e D3e F#3e | A1q. D3e C#3e G3e |
+strings.s1  | !p F#4h.~ | F#4h. | G4h.~ | G4h.~ | !mp G4h.~ | G4h. | !p F#4h. | E4h. |
+strings.s2  | !p D4h.~ | D4h.~ | D4h. | E4h. | !mp D4h. | E4h. | !p D4h.~ | D4h C#4q |
+strings.s3  | !p B3h. | A3h. | B3h.~ | B3h.~ | !mp B3h. | C4h. | !p B3h. | A3h. |
+cello       | !mp G2h. | F#2h. | E2h. | C3h. | B2h. | A2h. | G2h. | A2h. |
+
+section A2 bars=16
+// bars 1-8: flute melody, oboe counter-line
+flute       | !mf F#5h E5q | F#5q. A5e B5q | A5h. | rq B5q A5q | F#5h E5q | D5q. E5e F#5q | E5h. | E5h A4q |
+oboe        | !mp A4h. | D5h. | B4q C#5q D5q | E5h C#5q | A4h. | F#4q. G4e A4q | G4q A4q B4q | D5h C#5q |
+harp        | !mp D2e A2e D3e F#3e A3e D4e | B1e F#2e B2e D3e F#3e A3e | G1e D2e B2e D3e F#3e A3e | A1e E2e A2e D3e C#3e E3e |
+harp        | F#1e C#2e A2e C#3e E3e A3e | B1e F#2e B2e D3e F#3e A3e | E2e B2e D3e G3e B3e D4e | A1e E2e A2e D3e C#3e G3e |
+strings.s1  | !p D4h.~ | D4h.~ | D4h.~ | D4h C#4q~ | C#4h. | D4h.~ | D4h.~ | D4h C#4q |
+strings.s2  | !p A3h.~ | A3h. | B3h. | A3h.~ | A3h.~ | A3h. | B3h. | A3h. |
+strings.s3  | !p F#3h.~ | F#3h.~ | F#3h. | G3h. | E3h. | F#3h. | G3h.~ | G3h. |
+cello       | !mp D3h. | B2h A2q | G2h. | A2h. | F#2h. | B2h. | E2h. | A2h. |
+// bars 9-16: the climax, sixths and thirds into the cadence
+flute       | F#5h E5q | F#5q. A5e B5q | !f D6h. | C#6q B5q A5q | !mf B5h A5q | F#5q. E5e D5q | E5q. F#5e E5q | !mp D5h. |
+oboe        | !mf D5h. | A4q. C#5e D5q | B4q D5q F#5q | E5q D5q C#5q | !mp G5h F#5q | A4h F#4q | C#5q. D5e C#5q | F#4h. |
+harp        | D2e A2e D3e F#3e A3e D4e | B1e F#2e B2e D3e A2t D3t F#3t A3t D4t F#4t A4t D5t | G1e D2e B2e F#3e A3e D4e | F#1e C#2e A2e C#3e E3e A3e |
+harp        | !p E2e B2e D3e G3e B3e G3e | A1e A2e D3e F#3e A3e F#3e | A1e E2e G2e C#3e E3e G3e | D2e A2e D3e F#3e A3e D4e |
+strings.s1  | !mp D4h.~ | D4h. | !mf F#4h. | E4h.~ | !mp E4h. | D4h. | C#4h. | !p D4h. |
+strings.s2  | !mp A3h. | B3h A3q | !mf B3h. | C#4h. | !mp B3h. | A3h.~ | A3h.~ | !p A3h. |
+strings.s3  | !mp F#3h.~ | F#3h. | !mf G3h. | A3h. | !mp G3h. | F#3h. | G3h. | !p F#3h. |
+cello       | D3h. | B2h A2q | !mf G2h. | F#2h. | !mp E2h. | A2h.~ | A2h. | D3h. |
+
+section Outro bars=4
+// the music box remembers the end of the tune: 6 5 | 3 - 2 | 2 | 1
+mbox        | !mf rq B6q A6q | F#6h E6q | E6h. | D6h. |
+harp        | !p G1e D2e B2e F#3e A3e F#3e | F#1e D2e A2e D3e F#3e D3e | E2e B2e D3e G3e A2e C#3e | !pp D2e A2e D3e F#3e A3q |
+strings.s1  | !p D4h.~ | D4h.~ | D4h C#4q | !pp D4h. |
+strings.s2  | !p B3h. | A3h. | B3h A3q | !pp A3h. |
+strings.s3  | !p F#3h.~ | F#3h. | G3h. | !pp F#3h. |
+cello       | !p G2h. | F#2h. | E2h A2q | !pp D2h. |
+
+form: Intro A1 B A2 Outro

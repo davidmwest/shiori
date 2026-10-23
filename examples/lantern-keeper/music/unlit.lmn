@@ -1,0 +1,76 @@
+LMN 1
+title: Unlit
+artist: Shiori examples
+tempo: 56
+time: 3/4
+key: D minor
+mood: quiet dread; the dark lighthouse, the fourth plate
+
+// ---------------------------------------------------------------------------
+// Mio's theme in the parallel minor. The rising sixth shrinks to a minor
+// sixth (A3 -> F4) and both of the tune's steps become semitone sighs:
+// F -> E and Bb -> A. Major-key harmony is mapped to its minor shadow
+// (D -> Dm, Bm7 -> Bbmaj7, Gmaj7 -> Gm, F#m7 -> Fmaj7, Em7 -> Em7b5).
+//
+// The melody is fragmented: the piano plays a phrase, stops, starts again.
+// In A' it climbs F4. A4 Bb4 toward the place where the theme's high D
+// should shine, and the light never comes: two bars of silence over Gm,
+// with only a distant timpani roll. The music box then plays the tune from
+// memory over a chromatic lament bass (D C# C B Bb A, Purcell's ground),
+// and stops on E over A7, unresolved. The loop resolves it to D.
+//
+// FORM  28 bars of 3/4 at 56 = 1:30
+//   Intro   4  contrabass pedal D, cello sighs A Bb A, piano tolls like a
+//              bell buoy, timpani roll far off
+//   A       8  piano: hook, silence, hook again; cello echoes each sigh
+//   A'      8  piano: second half of the tune, then the missing climax
+//   Lament  8  music box over the descending ground; high strings hold A
+//              above a sighing inner voice F E F F F E F E
+//
+// HARMONY
+//   A:      Dm | Dm | Bbmaj7 | Bbmaj7 | Gm | Gm(add9) | A7b9 | A7b9 |
+//   A':     Fmaj7 | Gm7 | Em7b5 | A7 | Dm | Bbmaj7 | Gm | Gm A |
+//   Lament: Dm | A/C# | Dm/C | Bm7b5 | Bbmaj7 | A7 | Bbmaj7 | A7 |
+// ---------------------------------------------------------------------------
+
+track piano    piano          vol=76 pan=-10 reverb=50
+track mbox     music_box      vol=58 pan=24  reverb=65
+track high     slow_strings   vol=50 pan=16  reverb=60
+track cello    cello          vol=60 pan=8   reverb=45
+track cbass    contrabass     vol=64 pan=-6  reverb=45
+track timp     timpani        vol=40 pan=-22 reverb=75
+
+section Intro bars=4
+cbass       | !p D2h.~ | D2h.~ | D2h.~ | D2h. |
+cello       | !p A2h. | Bb2h. | A2h.~ | A2h. |
+piano       | !p [D2 D3]h. | R | [D2 D3]h. | rh !mp A3q |
+timp        | R | R | !pp D2t3*12 !p D2t3*24 | !p D2t3*12 !pp D2t3*24 |
+
+section A bars=8
+// the hook, a held breath, the hook again
+piano       | !mp F4h E4q | R | rq rq A3q | F4h E4q | F4q. A4e Bb4q | A4h. | rq Bb4q A4q | R |
+cello       | !p F3h. | E3h. | D3h.~ | D3h.~ | D3h. | Bb2h. | C#3h. | Bb2h A2q |
+cbass       | !p D2h.~ | D2h. | Bb1h.~ | Bb1h. | G1h.~ | G1h. | A1h.~ | A1h. |
+high        | R | R | !p A4h.~ | A4h. | D5h.~ | D5h. | C#5h.~ | C#5h. |
+timp        | R | R | R | R | R | R | R | !pp A2t3*12 !p A2t3*12 !pp A2t3*12 |
+
+section Aprime bars=8
+// the second half of the tune; it climbs to Bb4 and the high D never sounds
+piano       | !mp F4h E4q | D4q. E4e F4q | E4h. | E4h A3q | F4h E4q | F4q. A4e Bb4q | R | R |
+cello       | !p A2h. | Bb2h.~ | Bb2h. | C#3h. | D3h.~ | D3h. | Bb2h.~ | Bb2h A2q |
+cbass       | !p F1h. | G1h. | E1h. | A1h. | D2h. | Bb1h. | G1h.~ | G1h A1q |
+high        | !p C5h. | Bb4h.~ | Bb4h. | A4h.~ | A4h. | D5h. | R | R |
+timp        | R | R | R | R | R | R | !pp G2t3*12 !p G2t3*12 !pp G2t3*12 | !pp G2t3*24 rq |
+mbox        | R | R | R | R | R | R | R | rh !p A5q |
+
+section Lament bars=8
+// the music box remembers the tune and runs down before the last note
+mbox        | !mf F6h E6q | rq rq E6q | F6q. A6e Bb6q | A6h. | rq Bb6q A6q | F6h E6q | D6q. E6e F6q | E6h. |
+high        | !p A4h.~ | A4h.~ | A4h.~ | A4h.~ | A4h.~ | A4h.~ | A4h.~ | A4h. |
+high.lo     | !p F4h. | E4h. | F4h.~ | F4h.~ | F4h. | E4h. | F4h. | E4h. |
+cello       | !p D3h. | C#3h. | C3h. | B2h. | Bb2h. | A2h. | Bb2h. | A2h. |
+cbass       | !p D2h. | C#2h. | C2h. | B1h. | Bb1h. | A1h. | Bb1h. | A1h. |
+piano       | !p [D2 D3]h. | R | R | R | R | [A1 A2]h. | R | R |
+timp        | R | R | R | R | R | !pp A2t3*12 !p A2t3*24 | !p A2t3*12 !pp A2t3*24 | !pp A2t3*12 rh |
+
+form: Intro A Aprime Lament

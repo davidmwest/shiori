@@ -1,0 +1,124 @@
+LMN 1
+title: Two Lanterns
+artist: Shiori examples
+tempo: 76
+time: 3/4
+key: C major, lifting to D major
+mood: warm, full, tearful; the true ending
+
+// ---------------------------------------------------------------------------
+// Mio's theme as the true ending. It begins a step below home and climbs
+// back to the theme's own key, D major, for the last statement: the ones who
+// are nearly home.
+//
+//   Prelude  4  piano alone, the minor form of the hook (as in "Unlit") but
+//               warmed by F and Dm7 instead of the lament chords
+//   Verse   16  C major. Bars 1-8: the cello (Rin) sings Mio's tune over a
+//               rippling piano. Bars 9-16: the flute (Mio) takes it over with
+//               the harp, the cello turns into her counter-line
+//   Bridge   8  violins and horns in octaves on the theme's B-strain, choir
+//               enters, the line rises to Bb (bVI of D), timpani roll and a
+//               harp sweep on A7: the key lift
+//   Final   18  D major, tutti. Flute and violins in unison, piano an octave
+//               above from the climax on, horns on the counter-line. The high
+//               D6 that never came in "Unlit" arrives and is held for two bars
+//               while the bass climbs G G# A (the lament inverted), then a
+//               deceptive cadence (A -> Bm7) delays home once more
+//   Coda     5  the hook on piano, the flute holds D6, and the choir sings
+//               the "amen": Gm6 -> D, Bb finally resolving to A
+//
+// FORM  51 bars of 3/4, tempo 68 -> 72 -> 74 -> 76 -> 62 with broadening at
+//       the climax and the end, about 2:14. It ends; looped, the A minor
+//       prelude follows the final D naturally.
+//
+// HARMONY
+//   Prelude: Am(add9) | Fmaj7 | Dm7 | Fmaj7/G
+//   Verse:   C | Am7 | Fmaj7 | G7sus4 G | Em7 | Am7 | Dm7 | G7sus4 G7 |
+//            C | Am7 Am7/G | Fmaj7 | Em7 | Dm7 | C/G | G7 | C |
+//   Bridge:  Fmaj7 | C/E | Dm7 | Bbmaj7 | F/A | Gm7 | Bbmaj7 | A7sus4 A7
+//   Final:   D | Bm7 | Gmaj7 | A7sus4 A | F#m7 | Bm7 | Em7 | A7sus4 A7 |
+//            D | Bm7 Bm7/A | Gmaj7 | G#m7b5 | A | Bm7 | Em7 | A7sus4 A7 | D | D
+//   Coda:    D | Bm7 | Gmaj7 | Gm6 | D
+// ---------------------------------------------------------------------------
+
+track flute    flute         vol=80 pan=-10 reverb=40
+track piano    piano         vol=62 pan=-18 reverb=40
+track harp     harp          vol=58 pan=-30 reverb=45
+track strings  strings       vol=60 pan=10  reverb=45
+track cello    cello         vol=64 pan=20  reverb=40
+track horns    french_horn   vol=56 pan=28  reverb=50
+track choir    choir_pad     vol=38 pan=0   reverb=55
+track timp     timpani       vol=50 pan=-6  reverb=55
+
+section Prelude bars=4 tempo=68
+tempo       | . | . | . | >62 |
+piano       | rh !mp E4q | C5h B4q | C5q. E5e F5q | E5h. |
+piano.lh    | !pp A2e E3e B3e C4e B3e E3e | F2e C3e A3e C4e E4e C4e | D2e A2e F3e A3e C4e A3e | G1e G2e F3e A3e C4e A3e |
+cello       | R | R | R | rh !mp G3q |
+
+section Verse bars=16 tempo=72
+// bars 1-8: Rin's voice. The cello sings the tune; the piano ripples above it
+cello       | !mf E4h D4q | E4q. G4e A4q | G4h. | rq A4q G4q | E4h D4q | C4q. D4e E4q | D4h. | D4h rq |
+piano       | !p re C5e E5e G5e E5e C5e | re C5e E5e G5e E5e C5e | re C5e E5e A5e E5e C5e | re C5e D5e F5e D5e B4e |
+piano       | re B4e E5e G5e E5e B4e | re C5e E5e A5e E5e C5e | re C5e F5e A5e F5e C5e | re C5e D5e F5e D5e B4e |
+piano.lh    | !p [C2 G2]h. | [A1 E2]h. | [F1 C2]h. | [G1 D2]h. | [E1 B1]h. | [A1 E2]h. | [D2 A2]h. | [G1 D2]h. |
+flute       | R | R | R | R | R | R | R | rh !mp G4q |
+harp        | R | R | R | R | R | R | R | R |
+// bars 9-16: Mio's flute takes the tune; the cello answers underneath
+flute       | !mp E5h D5q | E5q. G5e A5q | !mf C6h. | B5q A5q G5q | A5h G5q | !mp E5q. D5e C5q | D5q. E5e D5q | C5h. |
+cello       | !p C4h. | G3q. B3e C4q | !mp A3q C4q E4q | D4q C4q B3q | F4h E4q | !p G3h E3q | B3q. C4e B3q | E3h. |
+piano       | R | R | R | R | R | R | R | R |
+piano.lh    | [C2 G2]h. | [A1 E2]h G1q | [F1 C2]h. | [E1 B1]h. | [D2 A2]h. | [G1 G2]h. | [G1 D2]h. | [C2 G2]h. |
+harp        | !p C2e G2e C3e E3e G3e E3e | A1e E2e A2e C3e G2e E3e | !mp F1e C2e A2e E3e A3e C4e | E2e B2e D3e G3e B3e G3e |
+harp        | D2e A2e C3e F3e A3e F3e | !p G1e G2e C3e E3e G3e E3e | G1e D2e F2e B2e D3e F3e | C2e G2e C3e E3e G3e C4e |
+
+section Bridge bars=8 tempo=74
+tempo       | . | . | . | . | . | . | . | >66 |
+strings     | !mf A4q. C5e D5q | C5h. | D5q. F5e G5q | F5h. | !f A5h G5q | F5q G5q A5q | !ff Bb5h. | A5h A4q |
+horns       | !mp A3q. C4e D4q | C4h. | D4q. F4e G4q | F4h. | !mf [F4 A4]h [E4 G4]q | [D4 F4]q [E4 G4]q [F4 A4]q | !f [F4 Bb4]h. | [D4 A4]h [C#4 G4]q |
+choir       | R | R | R | R | !mp [A3 C4 F4]h. | !mf [Bb3 D4 F4]h.~ | !f [Bb3 D4 F4]h. | [A3 D4 E4]h [A3 C#4 E4]q |
+harp        | !p F2e C3e E3e A3e C4e A3e | E2e C3e E3e G3e C4e G3e | D2e A2e C3e F3e A3e F3e | Bb1e F2e A2e D3e F3e D3e |
+harp        | !mp A1e F2e C3e F3e A3e F3e | G1e D2e F2e Bb2e D3e F3e | !mf Bb1e F2e A2e D3e F3e A3e | A1e E2e A2e D3e C#3t E3t G3t A3t C#4t E4t G4t A4t |
+cello       | !p F3h. | E3h. | D3h. | Bb2h. | !mp A2h. | G2h. | !mf Bb2h. | A2h. |
+piano.lh    | !p [F2 F3]h. | [E2 E3]h. | [D2 D3]h. | [Bb1 Bb2]h. | !mp [A1 A2]h. | [G1 G2]h. | !mf [Bb1 Bb2]h. | [A1 A2]h. |
+timp        | R | R | R | R | R | R | !p Bb2t3*12 !mp Bb2t3*24 | !mp A2t3*12 !mf A2t3*12 !f A2t3*12 |
+flute       | R | R | R | R | R | R | R | rh !f A4q |
+
+section Final bars=18 tempo=76
+tempo       | . | . | . | . | . | . | . | . | . | . | >72 | >66 | 72 | . | . | >66 | >60 | 60 |
+// bars 1-8: the theme in its own key, everyone together
+flute       | !f F#5h E5q | F#5q. A5e B5q | A5h. | rq B5q A5q | F#5h E5q | D5q. E5e F#5q | E5h. | E5h A4q |
+strings     | !f F#5h E5q | F#5q. A5e B5q | A5h. | rq B5q A5q | F#5h E5q | D5q. E5e F#5q | E5h. | E5h A4q |
+horns       | !mf A3h. | D4h. | B3q C#4q D4q | E4h C#4q | A3h. | F#3q. G3e A3q | G3q A3q B3q | D4h C#4q |
+choir       | !mp [F#3 A3 D4]h.~ | [F#3 A3 D4]h. | [F#3 B3 D4]h. | [G3 A3 D4]h [G3 A3 C#4]q | [E3 A3 C#4]h. | [F#3 A3 D4]h. | [G3 B3 D4]h. | [G3 A3 D4]h [G3 A3 C#4]q |
+harp        | !p D2s A2s D3s F#3s A3s D4s F#4s D4s A3s F#3s D3s A2s | B1s F#2s B2s D3s F#3s A3s D4s A3s F#3s D3s B2s F#2s | G1s D2s B2s F#3s A3s B3s D4s B3s A3s F#3s B2s D2s | A1s E2s A2s D3s E3s G3s A3s G3s E3s C#3s A2s E2s |
+harp        | F#1s C#2s A2s C#3s E3s A3s C#4s A3s E3s C#3s A2s C#2s | B1s F#2s B2s D3s F#3s A3s D4s A3s F#3s D3s B2s F#2s | E2s B2s D3s G3s B3s D4s E4s D4s B3s G3s D3s B2s | A1s E2s A2s D3s G3s A3s D4s A3s G3s E3s C#3s A2s |
+cello       | !mf D3h. | B2h. | G2h. | A2h. | F#2h. | B2h. | E2h. | A2h. |
+piano.lh    | !mp [D2 D3]h. | [B1 B2]h. | [G1 G2]h. | [A1 A2]h. | [F#1 F#2]h. | [B1 B2]h. | [E1 E2]h. | [A1 A2]h. |
+piano       | R | R | R | R | R | R | R | R |
+timp        | !f D2q> rq rq | R | R | R | R | R | R | !mp A2t3*12 !mf A2t3*24 |
+// bars 9-18: the light. D6 held over G -> G#m7b5, then A -> Bm7 (deceptive), home
+flute       | F#5h E5q | F#5q. A5e B5q | !ff D6h.~ | D6h. | !f C#6q B5q A5q | B5h A5q | F#5q. E5e D5q | E5q. F#5e E5q | !mf D5h.~ | D5h. |
+strings     | F#5h E5q | F#5q. A5e B5q | !ff D6h.~ | D6h. | !f C#6q B5q A5q | B5h A5q | F#5q. E5e D5q | E5q. F#5e E5q | !mf D5h.~ | D5h. |
+horns       | D4h. | A3q. C#4e D4q | !f B3q D4q F#4q | G#4h F#4q | E4q D4q C#4q | !mf F#4h E4q | D4q. C#4e B3q | D4h C#4q | [A3 D4]h.~ | [A3 D4]h. |
+choir       | !mf [F#3 A3 D4]h. | [F#3 B3 D4]h [F#3 A3 D4]q | !f [B3 D4 F#4]h.~ | [B3 D4 F#4]h. | [A3 C#4 E4]h. | [A3 D4 F#4]h. | [G3 B3 E4]h. | [G3 A3 D4]h [G3 A3 C#4]q | !mf [F#3 A3 D4]h.~ | [F#3 A3 D4]h. |
+harp        | D2s A2s D3s F#3s A3s D4s F#4s D4s A3s F#3s D3s A2s | B1s F#2s B2s D3s F#3s A3s D4s A3s A2t D3t F#3t A3t D4t F#4t A4t D5t | !mp G1s D2s B2s F#3s A3s B3s D4s B3s A3s F#3s B2s D2s | G#1s D2s B2s D3s F#3s B3s D4s B3s F#3s D3s B2s D2s | A1s E2s A2s C#3s E3s A3s C#4s A3s E3s C#3s A2s E2s |
+harp        | !p B1s F#2s B2s D3s F#3s A3s D4s A3s F#3s D3s B2s F#2s | E2s B2s D3s G3s B3s D4s E4s D4s B3s G3s D3s B2s | A1s E2s A2s D3s G3s A3s D4s A3s G3s E3s C#3s A2s | D2s A2s D3s F#3s A3s D4s F#4s D4s A3s F#3s D3s A2s | D2s A2s D3s F#3s A3h |
+cello       | D3h. | B2h A2q | !f G2h. | G#2h. | !mf A2h. | B2h. | E2h. | A2h. | D2h.~ | D2h. |
+piano.lh    | [D2 D3]h. | [B1 B2]h [A1 A2]q | !mf [G1 G2]h. | [G#1 G#2]h. | !mp [A1 A2]h. | [B1 B2]h. | [E1 E2]h. | [A1 A2]h. | [D1 D2]h.~ | [D1 D2]h. |
+piano       | !mf F#6h E6q | F#6q. A6e B6q | !f D7h. | [G#6 B6 D7]h. | C#7q B6q A6q | B6h A6q | !mf F#6q. E6e D6q | E6q. F#6e E6q | D6h. | rh !mp A4q |
+timp        | !f D2q> rq rq | R | !mf D3t3*12 !f D3t3*24 | !f D3t3*12 !mf D3t3*12 !mp D3t3*12 | !f A2q> rq rq | R | R | !mp A2t3*12 !mf A2t3*24 | !f D2q> rq rq | R |
+
+section Coda bars=5 tempo=62
+tempo       | . | . | . | >56 | >48 |
+// the hook once more, alone; the flute holds the light; the choir's amen
+piano       | !mf F#5h E5q | F#5q. A5e B5q | D6h. | R | !p [A4 D5 F#5]h. |
+flute       | R | R | !p D6h.~ | D6h.~ | D6h. |
+strings.s1  | !pp D4h.~ | D4h.~ | D4h.~ | D4h.~ | D4h. |
+strings.s2  | !pp A3h.~ | A3h. | B3h. | Bb3h. | A3h. |
+choir       | R | R | R | !p [G3 Bb3 E4]h. | [F#3 A3 D4]h. |
+harp        | !p D2e A2e D3e F#3e A3e F#3e | B1e F#2e B2e D3e A3e D3e | G1e D2e B2e F#3e A3e D4e | G1e D2e Bb2e E3e G3e Bb3e | !pp D2s A2s D3s F#3s A3h |
+cello       | !p D3h. | B2h. | G2h. | G2h. | D2h. |
+timp        | R | R | R | R | !pp D2t3*24 rq |
+
+form: Prelude Verse Bridge Final Coda

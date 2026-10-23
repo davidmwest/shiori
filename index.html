@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shiori Engine</title>
+<style>
+  :root { --bg: #0b0d1a; --panel: #141832; --text: #f2f0fa; --dim: #a7a3bd; --accent: #f2a7c3; --accent2: #a9b8ff; --line: rgba(255,255,255,.12); }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg: #f6f4fb; --panel: #ffffff; --text: #1b1830; --dim: #5d5878; --accent: #c2477a; --accent2: #4b5fc4; --line: rgba(0,0,0,.12); } }
+  :root[data-theme="dark"] { --bg: #0b0d1a; --panel: #141832; --text: #f2f0fa; --dim: #a7a3bd; --accent: #f2a7c3; --accent2: #a9b8ff; --line: rgba(255,255,255,.12); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 "Hiragino Sans", "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 56px 16px 80px; }
+  h1 { font-family: "Hiragino Mincho ProN", Georgia, serif; font-weight: 400; font-size: 52px; margin: 0; letter-spacing: .04em; }
+  h1 span { color: var(--accent); font-size: .55em; margin-left: .4em; letter-spacing: .2em; }
+  .lead { color: var(--dim); font-size: 19px; max-width: 680px; }
+  h2 { font-size: 15px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent2); margin: 44px 0 14px; font-weight: 600; }
+  .games { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .game { display: block; padding: 20px 22px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); color: inherit; text-decoration: none; transition: border-color .15s, transform .15s; }
+  .game:hover, .game:focus-visible { border-color: var(--accent); transform: translateY(-2px); outline: none; }
+  .game b { display: block; font-size: 20px; margin-bottom: 4px; }
+  .game small { color: var(--dim); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .row a { font-size: 14px; color: var(--accent); }
+  code, pre { font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-x: auto; }
+  ul { padding-left: 20px; } li { margin: 4px 0; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Shiori<span>栞</span></h1>
+  <p class="lead">A visual novel engine designed to be written by language models: plain-text scripts, 2D and 3D stages, music in LMN, and a draft VNDB entry for every game.</p>
+
+  <h2>Example games</h2>
+  <div class="games" id="games">
+    <a class="game" href="player.html?game=examples/lantern-keeper">
+      <b>The Lantern Keeper</b>
+      <small>A short example from the spec: two sisters, a dark lighthouse, four endings (one unlocks), ADV and NVL, a 3D headland, LMN music.</small>
+    </a>
+  </div>
+
+  <h2>Start</h2>
+  <ul>
+    <li>Read or give a model <a href="SHIORI-Spec.md">SHIORI-Spec.md</a>, the full specification.</li>
+    <li>Add <code>&amp;dev=1</code> to a game URL for live reload, variables and jump-to-scene.</li>
+    <li>Command line, from this folder:</li>
+  </ul>
+<pre>bin/shiori new games/my-game     # start a game from the template
+bin/shiori check games/my-game   # errors and warnings with fixes
+bin/shiori explore games/my-game # every route and ending
+bin/shiori vndb games/my-game    # advisory VNDB read + draft entry
+bin/shiori serve games/my-game   # play it in the browser</pre>
+</main>
+</body>
+</html>

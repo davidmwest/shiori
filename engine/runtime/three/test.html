@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shiori 3D layer test</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/","@pixiv/three-vrm":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.3/lib/three-vrm.module.min.js"}}</script>
+<style>
+  :root { color-scheme: dark; --bg: #0b0e17; --panel: #141a28; --line: #263049; --text: #d9e1f2; --dim: #8693ad; --accent: #8fb8ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; }
+  #stage { display: block; width: 100%; max-height: calc(100vh - 150px); object-fit: contain; background: #000; aspect-ratio: 16 / 9; }
+  #ui { padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; border-top: 1px solid var(--line); background: var(--panel); }
+  .grp { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .grp > b { color: var(--dim); font-weight: 600; margin-right: 2px; font-size: 12px; }
+  button, select { background: #1d2538; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: #2b3d66; border-color: var(--accent); }
+  #stats { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--accent); }
+  #err { color: #ff9a9a; white-space: pre-wrap; padding: 0 14px; }
+</style>
+</head>
+<body>
+<canvas id="stage" width="1920" height="1080"></canvas>
+<div id="ui">
+  <div class="grp"><b>Story</b><button id="seq">▶ pier → cliff (5 s) → door (3 s)</button><button id="skip">Skip tweens</button></div>
+  <div class="grp"><b>From</b><span id="marks"></span></div>
+  <div class="grp"><b>Camera</b><button id="orbit">Orbit lamp 360°</button><button id="zoom">Zoom ×1.6</button><button id="roll">Roll 8°</button><button id="reset">Reset</button>
+    <select id="ease"><option>inout</option><option>linear</option><option>in</option><option>out</option><option>back</option><option>bounce</option></select></div>
+  <div class="grp"><b>Doll</b><button id="dollX">Show at x=0.3</button><button id="dollSea">Show at sea</button><button id="dollCliff">at cliff</button><button id="dollHide">Hide</button>
+    <button data-attr="neutral">neutral</button><button data-attr="smile">smile</button><button data-attr="sad">sad</button><button data-attr="surprised">surprised</button><button data-attr="blush">blush</button><button id="speak">Speak</button><button id="lookDoll">Look at doll</button></div>
+  <div class="grp"><b>Quality</b><button id="qHigh" class="on">high</button><button id="qLow">low</button>
+    <select id="res"><option value="1920x1080">1920×1080</option><option value="1280x720">1280×720</option><option value="2560x1440">2560×1440</option></select></div>
+  <div id="stats">…</div>
+</div>
+<div id="err"></div>
+<script type="module">
+import { createWorld3D } from './world3d.js';
+
+const stage = document.getElementById('stage');
+const ctx = stage.getContext('2d');
+const gameBase = new URL('../../../examples/lantern-keeper/', location.href);
+const resolveUrl = p => new URL(p, gameBase).href;
+const loadModule = p => import(resolveUrl(p));
+const DECL = { id: 'lighthouse', path: 'worlds/lighthouse.js', opts: { marks: ['cliff', 'lamp', 'door', 'sea', 'pier'], camera: 'cliff' } };
+const DOLL_DECL = { id: 'doll', path: new URL('./models/doll.js', import.meta.url).href, opts: { scale: 1 } };
+const errBox = document.getElementById('err');
+const params = new URLSearchParams(location.search);
+
+let world = null, quality = params.get('quality') === 'low' ? 'low' : 'high';
+let cam = { zoom: 1, x: 0, y: 0, rotate: 0, from: 'cliff', look: null, fov: null };
+let doll = null, speaking = false;
+const ease = () => document.getElementById('ease').value;
+
+async function boot() {
+  errBox.textContent = '';
+  if (world) { world.dispose(); world = null; }
+  const t0 = performance.now();
+  const w = await createWorld3D({ width: stage.width, height: stage.height, resolveUrl, loadModule, quality });
+  try { await w.setWorld(DECL); }
+  catch (e) { errBox.textContent = e.message; console.error(e); }
+  world = w;
+  window.world = w;
+  console.log(`[test] world ready in ${(performance.now() - t0).toFixed(0)} ms (quality ${quality})`);
+  const m = document.getElementById('marks'); m.innerHTML = '';
+  for (const name of w.markNames()) {
+    const b = document.createElement('button'); b.textContent = name;
+    b.onclick = () => camera({ from: name, look: null }, 3);
+    m.appendChild(b);
+  }
+  if (doll) { const d = doll; doll = null; showDoll(d.mark, d.x); }
+}
+
+function camera(change, time, orbit = 0) {
+  cam = { ...cam, ...change };
+  world && world.setCamera(cam, { time, ease: ease(), orbit });
+}
+
+function showDoll(mark, x = 0.3) {
+  if (!world) return;
+  const actor = { id: 'doll', kind: 'model', attrs: doll ? doll.attrs : { expression: 'neutral' }, x, y: 0, scale: 1, flip: false, mark: mark || null };
+  if (doll && world) { world.updateActor(actor, { time: 0.8, ease: 'inout' }); doll = actor; return; }
+  doll = actor;
+  world.showActor(actor, DOLL_DECL, { time: 0.6 }).catch(e => { errBox.textContent = e.message; });
+  if (speaking) world.setSpeaking('doll');
+}
+
+document.getElementById('seq').onclick = async () => {
+  camera({ from: 'pier', look: 'lamp' }, 0);
+  await new Promise(r => setTimeout(r, 1500));
+  camera({ from: 'cliff', look: 'lamp' }, 5);
+  await waitCamera(5);
+  await new Promise(r => setTimeout(r, 1200));
+  camera({ from: 'door', look: 'lamp' }, 3);
+};
+function waitCamera(s) { return new Promise(r => { const t = performance.now(); const tick = () => (!world || !world.busy || performance.now() - t > s * 1000 + 200) ? r() : setTimeout(tick, 50); tick(); }); }
+document.getElementById('skip').onclick = () => world && world.skipTweens();
+document.getElementById('orbit').onclick = () => camera({ look: 'lamp' }, 10, 360);
+document.getElementById('zoom').onclick = () => camera({ zoom: cam.zoom > 1 ? 1 : 1.6 }, 1.5);
+document.getElementById('roll').onclick = () => camera({ rotate: cam.rotate ? 0 : 8 }, 1.5);
+document.getElementById('reset').onclick = () => { cam = { zoom: 1, x: 0, y: 0, rotate: 0, from: null, look: null, fov: null }; world && world.setCamera(cam, { time: 2, ease: ease() }); };
+document.getElementById('dollX').onclick = () => showDoll(null, 0.3);
+document.getElementById('dollSea').onclick = () => showDoll('sea');
+document.getElementById('dollCliff').onclick = () => showDoll('cliff');
+document.getElementById('dollHide').onclick = () => { world && world.hideActor('doll', { time: 0.5 }); doll = null; };
+document.querySelectorAll('[data-attr]').forEach(b => b.onclick = () => {
+  if (!doll) showDoll(null, 0.3);
+  doll = { ...doll, attrs: { expression: b.dataset.attr } };
+  world && world.updateActor(doll, { time: 0 });
+});
+document.getElementById('speak').onclick = e => { speaking = !speaking; e.target.classList.toggle('on', speaking); world && world.setSpeaking(speaking ? 'doll' : null); };
+document.getElementById('lookDoll').onclick = () => camera({ look: cam.look === 'doll' ? 'lamp' : 'doll' }, 1.5);
+for (const [id, q] of [['qHigh', 'high'], ['qLow', 'low']]) document.getElementById(id).onclick = () => {
+  quality = q;
+  document.getElementById('qHigh').classList.toggle('on', q === 'high');
+  document.getElementById('qLow').classList.toggle('on', q === 'low');
+  boot().then(() => world.setCamera(cam, { time: 0 }));
+};
+document.getElementById('res').onchange = e => {
+  const [w, h] = e.target.value.split('x').map(Number);
+  stage.width = w; stage.height = h;
+  world && world.resize(w, h);
+};
+
+// The compositor's frame loop, in miniature.
+let last = performance.now(), frames = 0, acc = 0, worst = 0;
+const stats = document.getElementById('stats');
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  frames++; acc += dt; worst = Math.max(worst, dt);
+  if (acc >= 0.5) { stats.textContent = `${(frames / acc).toFixed(0)} fps · worst ${(worst * 1000).toFixed(0)} ms · ${world ? world.canvas.width + '×' + world.canvas.height : ''} · ${quality}`; frames = 0; acc = 0; worst = 0; }
+  if (world) {
+    world.update(dt, now / 1000);
+    world.render();
+    ctx.clearRect(0, 0, stage.width, stage.height);
+    ctx.drawImage(world.canvas, 0, 0, stage.width, stage.height);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+// Automation helpers: ?clean=1 hides the controls, ?from=mark&look=mark sets the first view.
+window.go = (from, look, time = 0) => camera({ from, look: look || null }, time);
+// peek(fx, fy, scale): magnify part of the stage (for inspecting pixels); peek(0, 0, 1) resets.
+window.peek = (fx, fy, s = 2.4) => { stage.style.transformOrigin = `${fx * 100}% ${fy * 100}%`; stage.style.transform = s === 1 ? '' : `scale(${s})`; document.body.style.overflow = s === 1 ? '' : 'hidden'; };
+if (params.get('clean')) { document.getElementById('ui').style.display = 'none'; stage.style.maxHeight = '100vh'; }
+boot().then(() => { if (params.get('from')) camera({ from: params.get('from'), look: params.get('look') || null }, 0); });
+</script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+#!/bin/sh
+# Shiori command-line tools. Uses Node.js when installed; otherwise the
+# JavaScriptCore engine that ships with macOS. No installation needed.
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(dirname "$HERE")"
+CLI="$ROOT/tools/cli.js"
+
+if [ "$1" = "new" ]; then
+  DEST="$2"
+  if [ -z "$DEST" ]; then echo "Usage: shiori new <folder>" >&2; exit 2; fi
+  if [ -e "$DEST" ]; then echo "shiori: $DEST already exists" >&2; exit 1; fi
+  mkdir -p "$(dirname "$DEST")" && cp -R "$ROOT/templates/new-game" "$DEST" || exit 1
+  echo "Created $DEST. Next:"
+  echo "  shiori check $DEST      # compile and lint"
+  echo "  shiori play $DEST       # read it in the terminal"
+  echo "  shiori serve $DEST      # play it in a browser (the folder must be inside the engine folder)"
+  exit 0
+fi
+
+if [ "$1" = "build" ]; then
+  GAMEDIR="$2"; DEST="$3"
+  if [ -z "$GAMEDIR" ] || [ -z "$DEST" ]; then echo "Usage: shiori build <game-folder> <output-folder>" >&2; exit 2; fi
+  [ -f "$GAMEDIR/game.story" ] || { echo "shiori build: $GAMEDIR has no game.story" >&2; exit 1; }
+  [ -e "$DEST" ] && { echo "shiori build: $DEST already exists" >&2; exit 1; }
+  "$0" check "$GAMEDIR" >/dev/null || { echo "shiori build: the game has errors; run: shiori check $GAMEDIR" >&2; exit 1; }
+  mkdir -p "$DEST/engine" || exit 1
+  cp -R "$ROOT/engine/core" "$ROOT/engine/runtime" "$ROOT/engine/vendor" "$DEST/engine/"
+  rm -f "$DEST/engine/runtime/three/test.html"
+  (cd "$GAMEDIR" && tar cf - --exclude '.git' --exclude 'private' --exclude '*.md' .) | (mkdir -p "$DEST/game" && cd "$DEST/game" && tar xf -)
+  sed 's|<div id="shiori"></div>|<div id="shiori" data-game="game"></div>|' "$ROOT/player.html" > "$DEST/index.html"
+  cp "$ROOT/LICENSE" "$DEST/ENGINE-LICENSE.txt"
+  echo "Built $DEST — upload the whole folder to any static host (itch.io: zip it as an HTML game)."
+  echo "Test it: cd \"$DEST\" && python3 \"$ROOT/tools/serve.py\" 8780   then open http://localhost:8780/"
+  exit 0
+fi
+
+if [ "$1" = "selftest" ]; then
+  cd "$ROOT" || exit 1
+  set -- __selftest
+fi
+
+if [ "$1" = "serve" ]; then
+  GAMEDIR="${2:-examples/lantern-keeper}"
+  PORT="${PORT:-8777}"
+  ABS="$(cd "$GAMEDIR" 2>/dev/null && pwd)"
+  case "$ABS" in
+    "$ROOT"/*) REL="${ABS#$ROOT/}" ;;
+    *) echo "shiori serve: the game folder must be inside the engine folder ($ROOT) so one web server can serve both." >&2; exit 1 ;;
+  esac
+  echo "Serving $ROOT"
+  echo "Open: http://localhost:$PORT/player.html?game=$REL&dev=1"
+  cd "$ROOT" && exec python3 "$ROOT/tools/serve.py" "$PORT"
+fi
+
+if [ "$1" = "__selftest" ]; then CLI="$ROOT/tests/run.js"; shift; fi
+if command -v node >/dev/null 2>&1; then exec node "$CLI" "$@"; fi
+
+JSC=/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc
+if [ ! -x "$JSC" ]; then
+  echo "shiori: needs Node.js (https://nodejs.org) or macOS's JavaScriptCore." >&2
+  exit 2
+fi
+
+# JavaScriptCore cannot list folders, so pass a file listing of the game folder.
+GAME="."
+shift_seen=0
+for a in "$@"; do
+  if [ $shift_seen -eq 0 ]; then shift_seen=1; continue; fi
+  case "$a" in --*) ;; *) if [ -d "$a" ]; then GAME="$a"; break; fi ;; esac
+done
+LIST="$(mktemp -t shiori.XXXXXX)"
+OUT="$(mktemp -t shiori.XXXXXX)"
+(cd "$GAME" 2>/dev/null && find . -type f -not -path '*/.git/*' -not -path '*/node_modules/*' | sed 's|^\./||') > "$LIST"
+"$JSC" -m "$CLI" -- --host-listing "$LIST" --host-cwd "$PWD" "$@" >"$OUT" 2>&1
+status=$?
+# jsc has no exit(); the CLI ends with a marker exception carrying the code.
+code=$(grep -o '__shiori_exit_[0-9]*' "$OUT" | tail -1 | sed 's/__shiori_exit_//')
+sed '/^Exception: Error: __shiori_exit_/,$d' "$OUT"
+rm -f "$LIST" "$OUT"
+if [ -n "$code" ]; then exit "$code"; fi
+exit $status

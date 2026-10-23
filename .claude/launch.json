@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "shiori",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "exec python3 tools/serve.py \"${PORT:-8777}\""],
+      "port": 8777
+    }
+  ]
+}

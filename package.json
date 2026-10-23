@@ -1,0 +1,9 @@
+{
+  "name": "shiori-vn",
+  "version": "1.0.0",
+  "description": "Shiori: a visual novel engine designed to be written by language models. Plain-text scripts, 2D and 3D stages, VNDB-ready.",
+  "type": "module",
+  "bin": { "shiori": "bin/shiori" },
+  "license": "MIT",
+  "private": true
+}
