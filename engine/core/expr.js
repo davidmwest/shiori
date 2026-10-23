@@ -31,9 +31,18 @@ const OPS = ['==', '!=', '<=', '>=', '&&', '||', '+=', '-=', '*=', '/=', '<', '>
 // Inside quotes a backslash escapes only \\, \" and \'. Anything else (\n, \t,
 // a \u code) is an error: dropping the backslash would silently change the text.
 const ESCAPES = ['\\', '"', "'"];
-function escapeHint(e) {
+// rest: the text just after the backslash.
+function escapeHint(rest) {
+  const e = rest[0];
   if (e === 'n' || e === 'r') return 'A string cannot hold a line break. Put `{br}` in the text line instead, e.g. `{$first}{br}{$second}`.';
-  if (e === 'u' || e === 'x') return 'Type the character itself, e.g. `—` rather than `\\u2014`.';
+  if (e === 'u' || e === 'x') {
+    // Show the character the code stands for, when it is a valid one.
+    const m = /^(?:u\{([0-9a-fA-F]{1,6})\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2}))/.exec(rest);
+    const n = m ? parseInt(m[1] || m[2] || m[3], 16) : NaN;
+    const ok = n > 0x20 && n <= 0x10FFFF && !(n >= 0xD800 && n <= 0xDFFF) && n !== 0x7F;
+    return ok ? `Type the character itself: \`${String.fromCodePoint(n)}\` rather than \`\\${m[0]}\`.`
+      : 'Type the character itself, e.g. `é` rather than `\\u00e9`.';
+  }
   return 'Only `\\"`, `\\\'` and `\\\\` are escapes. Write `\\\\` for a backslash.';
 }
 
@@ -54,7 +63,7 @@ export function tokenize(src) {
       while (j < src.length && src[j] !== c) {
         if (src[j] === '\\' && j + 1 < src.length) {
           const e = src[j + 1];
-          if (!ESCAPES.includes(e)) throw new ExprError('E400', `Unknown escape \`\\${e}\` in a string.`, j, escapeHint(e));
+          if (!ESCAPES.includes(e)) throw new ExprError('E400', `Unknown escape \`\\${e}\` in a string.`, j, escapeHint(src.slice(j + 1)));
           s += e; j += 2;
         } else s += src[j++];
       }
@@ -78,6 +87,25 @@ export function tokenize(src) {
   }
   toks.push({ t: 'eof', pos: src.length });
   return toks;
+}
+
+// The "double-quoted" string that ends src after a space, as
+// { start, end } (end is just past the closing quote), or null. Strings are
+// found as tokenize() finds them (' or ", a backslash skips the next
+// character), so a `\"` inside does not end the string. Used to split
+// `cond "message"`; the caller checks that src.slice(0, start) is a condition.
+export function trailingString(src) {
+  let last = null;
+  for (let i = 0; i < src.length; i++) {
+    const q = src[i];
+    if (q !== '"' && q !== "'") continue;
+    const start = i++;
+    while (i < src.length && src[i] !== q) i += src[i] === '\\' ? 2 : 1;
+    if (i >= src.length) return null; // never closed
+    last = { start, end: i + 1, q };
+  }
+  if (!last || last.q !== '"' || last.start === 0 || !/\s/.test(src[last.start - 1]) || src.slice(last.end).trim()) return null;
+  return { start: last.start, end: last.end };
 }
 
 const BIN = {
@@ -133,7 +161,12 @@ export function parseExpr(src) {
     for (;;) {
       const t = peek();
       if (t.t !== 'op') break;
-      if (t.v === '=') throw new ExprError('E401', 'A single `=` assigns; conditions compare with `==`.', t.pos, 'Write `==` to compare, or use `@set` to assign.');
+      if (t.v === '=') {
+        // `=>` and `=<` are `>=` and `<=` typed the other way round.
+        const after = src[t.pos + 1];
+        if (after === '>' || after === '<') throw new ExprError('E400', `\`=${after}\` is not an operator.`, t.pos, `Did you mean \`${after}=\`?`);
+        throw new ExprError('E401', 'A single `=` assigns; conditions compare with `==`.', t.pos, 'Write `==` to compare, or use `@set` to assign.');
+      }
       const prec = BIN[t.v];
       if (!prec || prec < minPrec) break;
       next();

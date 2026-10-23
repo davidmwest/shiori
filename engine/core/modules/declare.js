@@ -26,19 +26,26 @@ function declareVar(persistent) {
   return function (cmd, ctx) {
     const kw = persistent ? 'persistent' : 'var';
     if (!cmd.raw) { ctx.diags.error('E402', `\`@${kw}\` needs a name and a starting value, e.g. \`@${kw} trust = 0\`.`, cmd.loc); return; }
+    // A declaration whose value is wrong still declares its name, so its
+    // uses are not reported as unknown (E201) on top of this error.
+    const failed = () => {
+      const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_])/.exec(cmd.raw);
+      if (m) ctx.addVar(m[1], null, persistent, cmd.loc, { failed: true });
+    };
     let a;
     try { a = parseAssignment(cmd.raw); }
     catch (e) {
       if (e instanceof ExprError) {
         if (/^\s*[A-Za-z_]\w*\s*$/.test(cmd.raw)) ctx.diags.error('E402', `\`@${kw} ${cmd.raw.trim()}\` needs a starting value.`, cmd.loc, `Write \`@${kw} ${cmd.raw.trim()} = 0\` (or = false, or = "").`);
         else ctx.diags.error(e.code, e.message, { ...cmd.loc, col: cmd.rawCol + assignmentErrorPos(cmd.raw, e) }, e.hint);
+        failed();
         return;
       }
       throw e;
     }
-    if (a.op !== '=') { ctx.diags.error('E402', `Declarations use \`=\`, not \`${a.op}\`.`, cmd.loc); return; }
+    if (a.op !== '=') { ctx.diags.error('E402', `Declarations use \`=\`, not \`${a.op}\`.`, cmd.loc); failed(); return; }
     const v = literal(a.value);
-    if (v === undefined) { ctx.diags.error('E402', 'A starting value must be a plain number, string, true or false.', cmd.loc, 'Compute values later with `@set`.'); return; }
+    if (v === undefined) { ctx.diags.error('E402', 'A starting value must be a plain number, string, true or false.', cmd.loc, 'Compute values later with `@set`.'); failed(); return; }
     ctx.addVar(a.name, v, persistent, cmd.loc);
   };
 }
@@ -148,7 +155,7 @@ export default {
     {
       name: 'character', decl: true, props: true, extraNamed: true,
       summary: 'Declare a character: display name, color, sprites or 3D model, and attribute groups.',
-      syntax: '@character <id> [name="Display Name"] [color=#hex] — or an indented block of `key: value` lines',
+      syntax: '@character <id> [name="Display Name"] [color=#hex]   (or an indented block of `key: value` lines)',
       positional: [{ name: 'id', type: 'ident', required: true, doc: 'The character id used in scripts (e.g. mio)' }],
       named: {},
       doc: [

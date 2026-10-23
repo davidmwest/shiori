@@ -548,7 +548,8 @@ export function compileProject(sources, opts = {}) {
     }
   }
   for (const v of Object.values(decls.vars)) {
-    if (!v.read && v.written) diags.warn('W612', `Variable \`${v.name}\` is set but never read, so it can't affect the story.`, v.loc, 'Read it in an `@if`, a `[if ...]` choice, or `{$name}` in text — or remove it.');
+    if (v.failed) continue; // its declaration already has an error
+    if (!v.read && v.written) diags.warn('W612', `Variable \`${v.name}\` is set but never read, so it can't affect the story.`, v.loc, 'Read it in an `@if`, a `[if ...]` choice, or `{$name}` in text. Or remove it.');
     else if (!v.read && !v.written) diags.warn('W601', `Variable \`${v.name}\` is declared but never used.`, v.loc);
   }
 
@@ -660,16 +661,20 @@ function makeContext({ diags, registry, decls, header, sceneMap, sceneOrder, end
       if (a && (!kinds || kinds.includes(a.kind))) { a.used = (a.used || 0) + 1; if (info.as) (a.usedAs = a.usedAs || {})[info.as] = true; return { value: s, kind: a.kind }; }
       // No kind list means "any asset or character" (they share one namespace).
       if (c && (!kinds || kinds.includes('character'))) { c.shown = (c.shown || 0) + 1; return { value: s, kind: 'character' }; }
+      const want = kinds ? kinds.filter(k => !SPECIAL_KINDS.includes(k)) : null;
+      // A declared id of the wrong kind is E205 even when it is also a color
+      // name: `@audio orange ...` then `@scene orange` is a mix-up, not a
+      // request for flat orange. (none, all and stop are reserved ids.)
+      if (a || c) {
+        const kind = a ? a.kind : 'character';
+        const hint = kinds && kinds.includes('color') && isColor(s) && has(COLOR_HEX, s)
+          ? `For the color ${s}, write \`${COLOR_HEX[s]}\` instead.` : undefined;
+        return { code: 'E205', error: `\`${s}\` is ${article(kind)} ${kind}, but this needs ${needOf(kinds)}.`, hint };
+      }
       if (kinds && kinds.includes('color') && (isColor(s))) return { value: s, kind: 'color' };
       if (kinds && kinds.includes('none') && s === 'none') return { value: null, kind: 'none' };
       if (kinds && kinds.includes('all') && s === 'all') return { value: 'all', kind: 'all' };
       if (kinds && kinds.includes('stop') && s === 'stop') return { value: 'stop', kind: 'stop' };
-      const want = kinds ? kinds.filter(k => !['color', 'none', 'all', 'stop'].includes(k)) : null;
-      if (a || c) {
-        const kind = a ? a.kind : 'character';
-        const need = want && want.length ? want.map(k => article(k) + ' ' + k).join(' or ') : 'something else';
-        return { code: 'E205', error: `\`${s}\` is ${article(kind)} ${kind}, but this needs ${need}.` };
-      }
       const pool = Object.values(decls.assets).filter(x => !want || want.includes(x.kind)).map(x => x.id)
         .concat(want && want.includes('character') ? Object.keys(decls.characters) : []);
       const m = didYouMean(s, pool);
@@ -867,7 +872,16 @@ function makeContext({ diags, registry, decls, header, sceneMap, sceneOrder, end
       return c;
     },
 
-    addVar(name, init, persistent, loc) {
+    // opts.failed: the declaration's value had an error (already reported).
+    // The name is still declared, with type 'any', so its uses don't get
+    // E201 "Declare it first"; a name that is taken or reserved is skipped.
+    addVar(name, init, persistent, loc, opts = {}) {
+      if (opts.failed) {
+        if (!decls.vars[name] && !has(FUNCTIONS, name) && !KEYWORDS.includes(name)) {
+          decls.vars[name] = { name, init, type: 'any', persistent: !!persistent, loc, read: false, written: false, failed: true };
+        }
+        return;
+      }
       if (decls.vars[name]) {
         diags.error('E204', `Variable \`${name}\` is already declared (at ${decls.vars[name].loc.file}:${decls.vars[name].loc.line}).`, loc);
         return;
@@ -921,6 +935,25 @@ function makeContext({ diags, registry, decls, header, sceneMap, sceneOrder, end
 }
 
 function article(word) { return /^[aeiou]/i.test(word) ? 'an' : 'a'; }
+
+// Kinds in an `asset:` type that are not declared things: a color, or the
+// words none, all and stop.
+const SPECIAL_KINDS = ['color', 'none', 'all', 'stop'];
+// The hex code of each color name isColor() accepts (as in CSS).
+const COLOR_HEX = {
+  black: '#000000', white: '#ffffff', red: '#ff0000', green: '#008000', blue: '#0000ff', yellow: '#ffff00',
+  cyan: '#00ffff', magenta: '#ff00ff', gray: '#808080', grey: '#808080', orange: '#ffa500', pink: '#ffc0cb',
+  purple: '#800080', transparent: '#00000000',
+};
+// What an `asset:` type accepts, for E205: ['image', 'world', 'color'] ->
+// 'an image, a world or a color'; ['color', 'none'] -> 'a color or `none`'.
+function needOf(kinds) {
+  const parts = kinds.filter(k => !SPECIAL_KINDS.includes(k)).map(k => article(k) + ' ' + k);
+  if (kinds.includes('color')) parts.push('a color');
+  for (const w of ['none', 'all', 'stop']) if (kinds.includes(w)) parts.push('`' + w + '`');
+  if (!parts.length) return 'something else';
+  return parts.length === 1 ? parts[0] : parts.slice(0, -1).join(', ') + ' or ' + parts[parts.length - 1];
+}
 
 // Plain text of a compiled line (for tools).
 export function lineText(ins, vars) {

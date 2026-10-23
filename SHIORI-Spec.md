@@ -373,7 +373,7 @@ If every option is hidden or locked, the menu is skipped with runtime warning R7
 ```
 
 - `@var` declares a story variable. It resets on New Game. `@persistent` declares one that keeps its value across all playthroughs and saves (for unlocks).
-- The starting value must be a literal. Its type is fixed: `@set` must assign the same type (E403).
+- The starting value must be a literal. Its type is fixed: `@set` must assign the same type (E403). A declaration whose value has an error still declares the name, so only that line is reported, not every use.
 - `@set name = value`, `+=`, `-=`, `*=`, `/=` (and `+=` appends to strings).
 
 **Conditions** (in `@if`, `@elif`, `[if ...]`, `[require ...]`, `@assert`):
@@ -385,7 +385,7 @@ If every option is hidden or locked, the menu is skipped with runtime warning R7
 | `+` `-` `*` `/` `%` `( )` | Arithmetic (`+` also joins strings). |
 | `"text"`, `12`, `true`, `false` | Literals. |
 
-Comparisons don't chain: write `1 < x and x < 5`, not `1 < x < 5` (E400). Comparing a true/false value with `<`, `<=`, `>` or `>=`, as in `(1 < x) < 5`, is warning W623. In a string in a condition or value, a backslash escapes only `\"`, `\'` and `\\`; any other, such as `\n`, is an error (E400). For a line break, put `{br}` in the text line. Quoted command arguments follow the same rule, with error E110 (2.9).
+Comparisons don't chain: write `1 < x and x < 5`, not `1 < x < 5` (E400). `=>` and `=<` are not operators: write `>=` and `<=` (E400). Comparing a true/false value with `<`, `<=`, `>` or `>=`, as in `(1 < x) < 5`, is warning W623. In a string in a condition or value, a backslash escapes only `\"`, `\'` and `\\`; any other, such as `\n`, is an error (E400). For a line break, put `{br}` in the text line. Quoted command arguments follow the same rule, with error E110 (2.9).
 
 Functions: `visited("scene")`, `ending_seen("id")`, `endings_seen()`, `random(1, 6)`, `chance(0.3)`, `min`, `max`, `clamp`, `abs`, `floor`, `ceil`, `round`, `len`, `upper`, `lower` (Appendix B). Random numbers come from a seed stored in the save, so they are reproducible on load and in `shiori play --seed`.
 
@@ -400,7 +400,7 @@ Functions: `visited("scene")`, `ending_seen("id")`, `endings_seen()`, `random(1,
 
 An `@elif` that tests the same condition as an earlier branch of its `@if` never runs (W622). Conditions with `random()` or `chance()` are not reported, because they roll again.
 
-Variables appear in text as `{$nickname}`. `@assert trust >= 0` checks an invariant: `shiori explore` reports every route where an assertion fails. A message in quotes may follow the condition: `@assert ran_to == "hinata" or ran_to == "suzu" "ran_to must be set before the finale"` (a trailing quoted string is the message only when the text before it is already a complete condition, so `@assert route == "rin"` compares with `"rin"`).
+Variables appear in text as `{$nickname}`. `@assert trust >= 0` checks an invariant: `shiori explore` reports every route where an assertion fails. A message in quotes may follow the condition: `@assert ran_to == "hinata" or ran_to == "suzu" "ran_to must be set before the finale"` (a trailing quoted string is the message only when the text before it is already a complete condition, so `@assert route == "rin"` compares with `"rin"`). The message is a quoted argument (2.9): `\"` puts a quote in it, and an escape other than `\"`, `\'` or `\\` is E110.
 
 ## 2.9 Declarations
 

@@ -255,7 +255,7 @@ export default {
     {
       name: 'camera',
       summary: 'Move the camera. 2D: zoom and pan the stage. 3D: fly between marks and look at things.',
-      syntax: '@camera [zoom=1] [x=0] [y=0] [rotate=0] [from=mark] [look=mark] [fov=50] [time=1] [ease=inout] [wait=false]  — or @camera reset',
+      syntax: '@camera [zoom=1] [x=0] [y=0] [rotate=0] [from=mark] [look=mark] [fov=50] [time=1] [ease=inout] [wait=false]   (or @camera reset)',
       positional: [{ name: 'action', type: 'enum:reset', doc: 'reset' }],
       named: {
         zoom: { type: 'number', doc: '2D/3D zoom (1 = normal).' },

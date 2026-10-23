@@ -1,7 +1,8 @@
 // Story flow: variables, calls, endings, chapters, input, waits, gameplay.
 
-import { parseAssignment, parseExpr, ExprError } from '../expr.js';
+import { parseAssignment, parseExpr, ExprError, trailingString } from '../expr.js';
 import { parseMarkup, plainText } from '../markup.js';
+import { tokenizeArgs } from '../parser.js';
 
 // Where the value starts in `name = value` (0-based offset into raw), or -1.
 export function assignmentValueStart(raw) {
@@ -51,6 +52,8 @@ export default {
         v.read = wasRead;
         const t = ctx.typeOf(a.value);
         const typeName = (x) => x === 'bool' ? 'true/false value' : x;
+        // A variable whose declaration failed has no known type (v.failed).
+        if (v.failed) return { op: 'set', name: a.name, opr: a.op, value: a.value };
         if (a.op === '=' && t !== 'any' && t !== v.type) {
           ctx.diags.error('E403', `\`${a.name}\` holds a ${typeName(v.type)}, but this assigns a ${typeName(t)}.`, cmd.loc,
             `It was declared as \`@var ${a.name} = ${JSON.stringify(v.init)}\`.`);
@@ -126,7 +129,7 @@ export default {
       syntax: '@chapter "Title" [subtitle="..."]',
       positional: [{ name: 'title', type: 'string', required: true, doc: 'The chapter title' }],
       named: { subtitle: { type: 'string', doc: 'A smaller line under the title.' }, card: { type: 'bool', default: true, doc: 'Show the title card.' } },
-      examples: ['@chapter "Chapter 1 — Salt"', '@chapter "Interlude" subtitle="Rin"'],
+      examples: ['@chapter "Chapter 1: Salt"', '@chapter "Interlude" subtitle="Rin"'],
       exec(ins, vm) {
         vm.state.chapter = ins.args.title;
         if (ins.args.card) vm.halt({ type: 'chapter', title: ins.args.title, subtitle: ins.args.subtitle || null, seconds: 2.5 });
@@ -141,10 +144,16 @@ export default {
         // A trailing "string" is the message only when the text before it is
         // already a complete condition, so `@assert route == "rin"` keeps
         // its last operand.
+        // The message follows the escape rule of every quoted argument: only
+        // \\, \" and \' (anything else is E110, reported by tokenizeArgs).
         let src = cmd.raw || '', message = null;
         if (!parses(src)) {
-          const m = /^(.*?)\s+"([^"]*)"\s*$/.exec(src);
-          if (m && parses(m[1])) { src = m[1]; message = m[2]; }
+          const t = trailingString(src);
+          if (t && parses(src.slice(0, t.start))) {
+            const [tok] = tokenizeArgs(src.slice(t.start, t.end), (cmd.rawCol || 1) - 1 + t.start, ctx.diags, cmd.loc);
+            src = src.slice(0, t.start).trimEnd();
+            message = tok.value;
+          }
         }
         const cond = ctx.compileExpr(src, cmd.loc, cmd.rawCol);
         return cond ? { op: 'assert', cond, message, src } : null;
@@ -188,7 +197,7 @@ export default {
         const v = ctx.decls.vars[args.pos.var];
         if (v) {
           v.written = true;
-          if (v.type !== 'string') ctx.diags.error('E403', `\`@input\` stores text, but \`${v.name}\` holds a ${v.type}.`, cmd.loc, `Declare it as \`@var ${v.name} = ""\`.`);
+          if (v.type !== 'string' && !v.failed) ctx.diags.error('E403', `\`@input\` stores text, but \`${v.name}\` holds a ${v.type}.`, cmd.loc, `Declare it as \`@var ${v.name} = ""\`.`);
         }
         return { op: 'cmd', name: 'input', args: { var: args.pos.var, prompt: args.pos.prompt || '', default: args.named.default != null ? args.named.default : (v ? v.init : ''), max: args.named.max } };
       },
