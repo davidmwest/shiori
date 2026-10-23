@@ -1,6 +1,6 @@
 # Handoff
 
-Where the Shiori work stands and what comes next, kept current so the next session can pick it up cold. Read `AGENTS.md` first for the rules.
+Where the Shiori work stands and what comes next, kept current so the next session can pick it up cold. Read `AGENTS.md` first for the rules, and `ORCHESTRATOR.md` for who owns what right now.
 
 - **Repo:** https://github.com/davidmwest/shiori
 - **Branch:** `claude/dazzling-meitner-uz8dhg` (the only branch besides `codex/*` worker branches; keep pushing here unless the author decides otherwise)
@@ -35,7 +35,7 @@ for i in 1 2 3 4 5; do git worktree remove --force .claude/worktrees/wf_ede3a973
   - vm-runtime (R18, `noblink:`, POV name in NVL);
   - suites registered, spec regenerated.
   - 401 tests pass under Node and Linux JavaScriptCore, and every game has 0 errors.
-- **Finishing in the cloud right now:** six groups, each with a fixer, a skeptical verifier and one repair pass. The cloud session merges them into the GitHub branch, regenerates the spec, runs selftest and pushes. The Mac session gets a message when that lands. **Until then, don't edit engine, CLI, test or spec files on the Mac**, or the merge will conflict.
+- **Finishing in the cloud right now:** six groups, each with a fixer, a skeptical verifier and one repair pass. The cloud session merges them into the GitHub branch, regenerates the spec, runs selftest and pushes. The signal that it has landed is the **round4** line in `ORCHESTRATOR.md`. **Until then, don't edit engine, CLI, test or spec files on the Mac**, or the merge will conflict.
   - **analysis:** R2/R19 call-aware reading runs, R3/R20 graph fall-through after @call, R4 Branching Plot through @call, prototype-safe tables, no em dashes in vndb output.
   - **explore:**
     - R1/R23: numeric and comma @input answers, plus `--answer var=text`.
