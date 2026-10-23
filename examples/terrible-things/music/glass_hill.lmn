@@ -1,0 +1,178 @@
+LMN 1
+title: The Glass Hill
+artist: Shiori examples
+tempo: 76
+time: 4/4
+key: D major, leaning to B minor
+mood: wide, luminous, bittersweet wonder with a thread of unease
+
+// ---------------------------------------------------------------------------
+// THE GLASS HILL (overture / main theme)
+//
+// THE HILL THEME. One cell, sung three times on the way up: a long note,
+// a dip to the note below and back, then a leap up a fifth that is held
+// over the next chord (so it lands as a 9th or a 7th: the light catching).
+//
+//   D5q. C#5e D5q A5q~ | A5h. G5e F#5e | B4q. A#4e B4q F#5q~ | F#5h. E5e D5e |
+//   G5q. F#5e G5q D6q~ | D6h. C#6e A5e | B5q. A5e G5q F#5q   | E5w          |
+//
+// The cell starts on D, then drops to B (the B-minor lean, with an A#
+// that glints like a crack), then climbs to G and the high D6; the tune
+// then walks down the scale. The open ending (E over A7) is replaced by
+// B5q. A5e G5q F#5e E5e | D5w when the phrase has to close.
+//
+// SUZU'S FIGURE (hidden): from bar 9 the celesta plays it, an octave up,
+// as a counter-line to the climb: D6 E6 F#6 A6 | B6 (dotted half) | E6,
+// a long fall that is never resolved. It comes back at the same place in
+// every statement of the theme (bars 9, 17 and 33). In the last one the
+// glass harmonica doubles its B and E at the figure's own octave (B5, E5).
+//
+// FORM  40 bars of 4/4 at 76 = 2:06
+//   Intro  4  piano chimes (rising fourths and fifths), piano arpeggios,
+//             a glass tone held on F#, strings pad
+//   A1     8  piano sings the theme over its own arpeggios; celesta enters
+//             at bar 9 with Suzu's figure; half cadence on E
+//   A2     8  strings take the theme; cello counter-melody; harp sparkles
+//             in the bars where the tune holds; celesta figure; cadence to D
+//   B      8  the climb. Cello melody rising D E F# G# A A# B C# against a
+//             falling bass B A# A G# G F# E A; a high glass F# never moves
+//             (the thread of unease); strings pick up into...
+//   A3     8  tutti: strings and cellos in octaves, piano in sixteenths,
+//             harp sweeps, celesta figure with the glass on B5 -> E5;
+//             the cadence turns aside to B minor
+//   Outro  4  the piano alone finishes the phrase, softly, on D. The loop
+//             returns to the Intro's Gmaj7 (IV), so the seam sounds like
+//             the next breath rather than a restart.
+//
+// HARMONY
+//   Intro: Gmaj7 | D/F# | Em7 | A7sus4
+//   A:     D | Gmaj7 | Bm | Em7 | Gmaj7 | D/F# | Em7 | A7sus4 A7      (A1)
+//                                             | Em7 A7 | D          (A2)
+//                                             | Em7 A7 | Bm7        (A3)
+//   B:     Bm | F#7/A# | D/A | E/G# | A7/G | F#7 | Em7 | A7sus4 A7
+//   Outro: Gmaj7 | D/F# | Em7 A7 | D
+//
+// Registers: bass in octave 1-2 (contrabass), arpeggios below C4, pad
+// A3-G4 (under the cellos in A3), melody B4-D6, celesta D6-B6, glass
+// around F#5 (the halo_pad adds its own octave above).
+// ---------------------------------------------------------------------------
+
+track piano    piano          vol=72 pan=-14 reverb=40
+track strings  strings        vol=74 pan=-8  reverb=50
+track pad      slow_strings   vol=44 pan=12  reverb=60
+track cello    cello          vol=64 pan=22  reverb=45
+track cbass    contrabass     vol=54 pan=4   reverb=35
+track harp     harp           vol=52 pan=-30 reverb=50
+track celesta  celesta        vol=58 pan=30  reverb=60
+track glass    halo_pad       vol=30 pan=-4  reverb=75
+
+section Intro bars=4
+// chimes on the hill: A-D-A, B-E-B
+piano       | !mp rh A5q D6q | A6h. rq | rh B5q E6q | B6h. rq |
+piano.lh    | !p G1e D2e B2e F#3e A3e F#3e D3e B2e | F#2e A2e D3e F#3e A3e F#3e D3e A2e | E2e B2e D3e G3e B3e G3e D3e B2e | A1e E2e A2e D3e E3e G3e E3e D3e |
+pad.s1      | R | !pp F#4w | G4w | G4w |
+pad.s2      | R | !pp D4w~ | D4w~ | D4w~ |
+pad.s3      | R | !pp A3w | B3w | A3w |
+cbass       | !pp G1w | F#1w | E1w | A1w |
+glass       | !pp F#5w~ | F#5w~ | F#5w | E5w |
+harp        | R | R | R | rh rq !p A2t D3t E3t G3t A3t D4t E4t G4t |
+
+section A1 bars=8
+// bars 5-8: the theme on piano, alone with its arpeggios
+piano       | !mp D5q. C#5e D5q A5q~ | A5h. G5e F#5e | B4q. A#4e B4q F#5q~ | F#5h. E5e D5e |
+piano.lh    | !p D2e A2e D3e E3e F#3e A3e F#3e E3e | G1e D2e B2e F#3e A3e F#3e D3e B2e | B1e F#2e B2e D3e F#3e B3e F#3e D3e | E2e B2e D3e G3e B3e G3e D3e B2e |
+pad.s1      | !pp F#4w~ | F#4w~ | F#4w | G4w~ |
+pad.s2      | !pp D4w~ | D4w~ | D4w~ | D4w~ |
+pad.s3      | !pp A3w | B3w~ | B3w~ | B3w~ |
+cbass       | !pp D2w | G1w | B1w | E2w |
+celesta     | R | R | R | R |
+harp        | R | R | R | R |
+// bars 9-12: the climb to D6; Suzu's figure enters on the celesta
+piano       | G5q. F#5e G5q D6q~ | D6h. C#6e A5e | B5q. A5e G5q F#5q | E5w |
+piano.lh    | G1e D2e B2e D3e A3e B3e A3e D3e | F#2e A2e D3e F#3e A3e F#3e D3e A2e | E2e B2e D3e G3e B3e G3e D3e B2e | A1e E2e A2e D3e A1e E2e G2e C#3e |
+pad.s1      | G4w | F#4w | G4w~ | G4w |
+pad.s2      | D4w~ | D4w~ | D4w~ | D4h C#4h |
+pad.s3      | B3w | A3w | B3w | A3w |
+cbass       | G1w | F#1w | E1w | A1w |
+celesta     | !mp D6q E6q F#6q A6q | B6h. E6q~ | E6w | R |
+harp        | R | R | R | rh rq !p A2t C#3t E3t G3t A3t C#4t E4t G4t |
+
+section A2 bars=8
+// bars 13-16: strings take the theme; the cello answers while it holds
+strings     | !mp D5q. C#5e D5q A5q~ | A5h. G5e F#5e | B4q. A#4e B4q F#5q~ | F#5h. E5e D5e |
+cello       | !mp F#3h. E3q | D3q. E3e F#3q G3q | F#3w | G3q. A3e B3q D4q |
+piano.lh    | !p D2e A2e D3e E3e F#3e A3e F#3e E3e | G1e D2e B2e F#3e A3e F#3e D3e B2e | B1e F#2e B2e D3e F#3e B3e F#3e D3e | E2e B2e D3e G3e B3e G3e D3e B2e |
+pad.s1      | !p F#4w~ | F#4w~ | F#4w | G4w~ |
+pad.s2      | !p D4w~ | D4w~ | D4w~ | D4w~ |
+pad.s3      | !p A3w | B3w~ | B3w~ | B3w~ |
+cbass       | !p D2w | G1w | B1w | E2w |
+harp        | R | !p rq B3e D4e F#4e A4e B4e D5e | R | rq B3e D4e E4e G4e B4e D5e |
+celesta     | R | R | R | R |
+// bars 17-20: the climb again, the figure again, and this time home
+strings     | !mf G5q. F#5e G5q D6q~ | D6h. C#6e A5e | B5q. A5e G5q F#5e E5e | !mp D5w |
+cello       | D4h B3h | A3q. B3e A3q F#3q | G3h E3q C#3q | D3w |
+piano.lh    | G1e D2e B2e D3e A3e B3e A3e D3e | F#2e A2e D3e F#3e A3e F#3e D3e A2e | E2e B2e D3e G3e A1e E2e G2e C#3e | D2e A2e D3e F#3e A3e F#3e D3e A2e |
+pad.s1      | G4w | F#4w | G4w | F#4w |
+pad.s2      | D4w~ | D4w~ | D4h C#4h | D4w |
+pad.s3      | B3w | A3w | B3h A3h | A3w |
+cbass       | G1w | F#1w | E1h A1h | D2w |
+harp        | R | rq A3e D4e F#4e A4e D5e F#5e | R | rq A3e D4e F#4e A4e D5e F#5e |
+celesta     | !mp D6q E6q F#6q A6q | B6h. E6q~ | E6w | R |
+
+section B bars=8
+// bars 21-24: the climb. The cello rises a step a bar while the bass
+// falls by semitones; the glass F# above never moves
+cello       | !mp D4h. C#4e D4e | E4h. F#4e E4e | F#4h. E4e F#4e | G#4h. A4e G#4e |
+cbass       | !p B1w | A#1w | A1w | G#1w |
+harp        | !p B1e F#2e B2e D3e F#3e D3e B2e F#2e | A#1e F#2e A#2e C#3e E3e C#3e A#2e F#2e | A1e F#2e A2e D3e F#3e D3e A2e F#2e | G#1e E2e G#2e B2e E3e B2e G#2e E2e |
+pad.s1      | !pp F#5w~ | F#5w~ | F#5w~ | F#5w~ |
+pad.s2      | !pp B4w | C#5w | D5w | E5w~ |
+glass       | !pp F#5w~ | F#5w~ | F#5w~ | F#5w~ |
+strings     | R | R | R | R |
+// bars 25-28: faster steps, a crescendo, and the strings' pickup
+cello       | !mf A4q. G4e A4q C#5q | A#4q. G#4e A#4q C#5q | B4q. A4e B4q E5q | !f D5h C#5h |
+cbass       | !mp G1w | F#1w | E1w | !mf A1w |
+harp        | !mp G1e E2e A2e C#3e E3e C#3e A2e E2e | F#1e C#2e F#2e A#2e C#3e E3e C#3e A#2e | E1e B1e E2e G2e B2e D3e B2e G2e | A1e E2e A2e D3e A2t C#3t E3t G3t A3t C#4t E4t G4t A4t C#5t E5t G5t A5t C#6t E6t G6t |
+pad.s1      | !p F#5w~ | F#5w~ | F#5w | !mp E5w |
+pad.s2      | !p E5w~ | E5w | D5w | !mp A4w |
+glass       | F#5w~ | F#5w~ | F#5w | E5w |
+strings     | R | R | R | rh. !mf A4e3 B4e3 C#5e3 |
+
+section A3 bars=8
+// bars 29-32: everyone. Strings and cellos in octaves
+strings     | !f D5q. C#5e D5q A5q~ | A5h. G5e F#5e | B4q. A#4e B4q F#5q~ | F#5h. E5e D5e |
+cello       | !f D4q. C#4e D4q A4q~ | A4h. G4e F#4e | B3q. A#3e B3q F#4q~ | F#4h. E4e D4e |
+piano.lh    | !mf (D2s A2s D3s F#3s A3s D4s A3s F#3s)*2 | (G1s D2s B2s D3s A3s B3s A3s D3s)*2 | (B1s F#2s B2s D3s F#3s B3s F#3s D3s)*2 | (E2s B2s D3s G3s B3s D4s B3s G3s)*2 |
+pad.s1      | !mp A3w | B3w | F#3w | B3w |
+pad.s2      | !mp F#3w | G3w | D3w | G3w |
+pad.s3      | !mp D3w~ | D3w | B2w | E3w |
+cbass       | !mf D2w | G1w | B1w | E2w |
+harp        | !mf D2t A2t D3t F#3t A3t D4t F#4t A4t rq rh | rq B3e D4e F#4e A4e B4e D5e | R | rq B3e D4e E4e B4e D5e B4e |
+celesta     | R | R | R | R |
+glass       | R | R | R | R |
+// bars 33-36: the summit; the figure on celesta and glass; the cadence
+// turns aside to B minor
+strings     | G5q. F#5e G5q D6q~ | !ff D6h. C#6e A5e | !f B5q. A5e G5q F#5e E5e | !mf D5w |
+cello       | G4q. F#4e G4q D5q~ | D5h. C#5e A4e | B4q. A4e G4q F#4e E4e | !mf D4w |
+piano.lh    | (G1s D2s G2s B2s D3s G3s D3s B2s)*2 | (F#2s A2s D3s F#3s A3s D4s A3s F#3s)*2 | E2s B2s D3s G3s B3s G3s D3s B2s A1s E2s A2s C#3s E3s G3s E3s C#3s | !mp (B1s F#2s B2s D3s F#3s A3s F#3s D3s)*2 |
+pad.s1      | !mf D4w | F#4w | E4w | !mp A3w |
+pad.s2      | !mf B3w | D4w | B3h C#4h | !mp F#3w |
+pad.s3      | !mf G3w | A3w | G3h A3h | !mp D3w |
+cbass       | !f G1w | F#1w | E1h A1h | !mf B1w |
+harp        | G2t D3t G3t B3t D4t G4t B4t D5t rq rh | rq A3e D4e F#4e A4e F#5e A5e | R | !mp rq D4e F#4e A4e B4e D5e F#5e |
+celesta     | !mf D6q E6q F#6q A6q | B6h. E6q~ | E6w | R |
+glass       | R | !p B5h. E5q~ | E5w | F#5w |
+
+section Outro bars=4
+// the piano alone finishes the phrase and comes home
+piano       | !mp G5q. F#5e G5q D6q~ | D6h. C#6e A5e | !p B5q. A5e G5q F#5e E5e | D5h. rq |
+piano.lh    | !p G1e D2e B2e D3e A3e B3e A3e D3e | F#2e A2e D3e F#3e A3e F#3e D3e A2e | E2e B2e D3e G3e A1e E2e G2e C#3e | !pp D2e A2e D3e E3e F#3q rq |
+cello       | !p B3w | A3w | G3w | !pp F#3h. rq |
+pad.s1      | !p G4w | F#4w | G4w | !pp F#4h. rq |
+pad.s2      | !p D4w~ | D4w | D4h C#4h | !pp D4h. rq |
+pad.s3      | !p B3w | A3w | B3h A3h | !pp A3h. rq |
+cbass       | !pp G1w | F#1w | E1h A1h | D2h. rq |
+glass       | !p D5w~ | D5w | E5w | F#5h. rq |
+harp        | R | !pp rq A3e D4e F#4e A4e D5e F#5e | R | D2h rh |
+
+form: Intro A1 A2 B A3 Outro

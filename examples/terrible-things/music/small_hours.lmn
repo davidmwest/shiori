@@ -1,0 +1,157 @@
+LMN 1
+title: Small Hours
+artist: Shiori examples
+tempo: 60
+time: 4/4
+key: E (a drone; E minor at most, sliding to F and back)
+mood: uneasy, intimate dread; the sound of a thought you can't stop having
+
+// ---------------------------------------------------------------------------
+// SMALL HOURS (dread)
+//
+// Everything hangs on E: the note Suzu's figure falls to, the note where she
+// changes her mind. A contrabass holds it, low strings hold its open fifth,
+// and a glass tone (halo pad) rings it faintly on top. A soft brush-kit kick is a
+// heartbeat, lub-dub (accent, then plain), every two beats.
+//
+// THE BROKEN FIGURE. Suzu's figure appears only as its first three notes,
+// D E F#, at its own pitches (or an octave up/down), never finished. Where
+// the A should be there is silence. Then comes the fall, a low E that goes
+// slightly flat. LMN has no microtones, so it sags by a glide (^) onto Eb,
+// on a voice that can bend (bowed glass, the halo glass, the cello), while
+// the drone and the glass still hold the true E. The ear hears an E going
+// out of tune ("a flat E, low and frightened").
+//
+//   piano  | D5q E5q F#5q rq | E4w ...           glass | E4h.~ E4q^ | Eb4w~
+//
+// THE SIGH. The cello's E D# E is the Hill theme's neighbour cell (do ti do),
+// slowed to a breath. Its D# is the flat E in another spelling.
+//
+// FORM  36 bars of 4/4, tempo 60 (rubato, and 60 -> 72 in Loop): about 2:21
+//   Intro    4  low piano cluster (E B F), the drone, the heartbeat, a glass
+//               E above, a few high celesta harmonics
+//   Thought  8  the figure on the piano, silence, the fall on bowed glass
+//               (E4 sags to Eb4); again on the celesta, and this time the
+//               glass E5 itself sags to Eb5 over the cello's sigh
+//   Kitchen  8  the drone slides up a semitone to F: Hinata's tired chord
+//               (F Ab C G, from morning_bread) on the glass; it warms to the
+//               kitchen chord itself (F A C G) with the head of her tune on
+//               the piano; then the floor drops a semitone into E minor
+//               (E G B F#, the same shape). The figure on bowed glass, slower;
+//               the fall on the cello, E3 sagging to Eb3
+//   Loop     8  the thought you can't stop having: the celesta circles D E F#
+//               in quarters against the 4/4, so every bar starts on a
+//               different note, then in eighths with the piano; the heart
+//               doubles its rate; the cello climbs E F F# G G# toward the A
+//               that never comes; E and Eb glass tones rub. It cuts off. A
+//               beat of silence, then the fall
+//   After    8  the drone returns, the figure once more at half speed on the
+//               piano, and the fall as a plainly wrong low Eb; the sigh; the
+//               heartbeat skips once, so its last beats sit 1.3 s before the
+//               end and the loop's 0.7 s gap lands the next beat on time.
+//               Nothing rings past the end: the seam is the quiet of the
+//               small hours, then the cluster again.
+//
+// HARMONY  (over the drone)
+//   Intro/Thought: E5 (E B) with E on top    Loop: E, with F, G, G# rising
+//   Kitchen: Fm(add9) | Fm(add9) | Fadd9 | Em(add9) | E5 ... (bass F F F E)
+//
+// Registers: drone E1/F1; low strings E2-F3; cello E3-G#3; bowed glass
+// F3-G4; halo glass Eb5-E5; piano clusters E1-F2, figure D5-F#5; celesta
+// D6-E7 (the loop and the harmonics).
+// ---------------------------------------------------------------------------
+
+track piano   piano         vol=72 pan=-10 reverb=60
+track glass   bowed_pad     vol=56 pan=12  reverb=70
+track halo    halo_pad      vol=36 pan=-20 reverb=75
+track chime   celesta       vol=50 pan=26  reverb=80
+track cello   cello         vol=52 pan=18  reverb=55
+track low     slow_strings  vol=46 pan=-6  reverb=60
+track drone   contrabass    vol=62 pan=0   reverb=50
+track heart   drums_brush   vol=30 pan=0   reverb=25
+
+section Intro bars=4
+piano.lo    | !p [E1 B1 F2]w | R | R | R |
+drone       | !pp E1w~ | E1w~ | E1w~ | E1w~ |
+low         | R | R | !pp [E2 B2]w~ | [E2 B2]w~ |
+halo        | R | !pp E5w~ | E5w~ | E5w~ |
+chime       | R | rh !pp B6q rq | R | rh rq !pp E7q |
+heart.kick  | !p Xx.. .... Xx.. .... | % | % | % |
+
+section Thought bars=8
+tempo       | . | . | . | >56 | 60 | . | . | >57 |
+// bars 1-4: the figure on the piano, the missing A, the fall on bowed glass
+piano       | !mf D5q E5q F#5q rq | !p E4w | R | R |
+glass       | R | !p E4w~ | E4q^ Eb4h. | R |
+halo        | E5w~ | E5w~ | E5w | R |
+cello       | R | R | R | rh !p E3h~ |
+chime       | R | R | R | R |
+piano.lo    | R | R | R | R |
+drone       | E1w~ | E1w~ | E1w~ | E1w~ |
+low         | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w~ |
+heart.kick  | !p Xx.. .... Xx.. .... | % | % | % |
+// bars 5-8: again, an octave up on the celesta; the piano falls to E4 and
+// this time the glass E above it sags
+chime       | !mf D6q E6q F#6q rq | R | R | rh rq !pp B6q |
+piano       | R | !p E4w | R | R |
+halo        | !p E5w~ | E5h.~ E5q^ | Eb5w | R |
+cello       | E3h D#3h | E3w~ | E3w | R |
+glass       | R | R | R | R |
+piano.lo    | R | R | !pp [E1 B1 F2]w | R |
+drone       | E1w~ | E1w~ | E1w~ | E1w |
+low         | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w |
+heart.kick  | Xx.. .... Xx.. .... | % | % | % |
+
+section Kitchen bars=8
+tempo       | . | . | >58 | 60 | . | . | . | >57 |
+// bars 1-4: up a semitone to F. Hinata's tired chord, then her kitchen
+// chord with the head of her tune, then the floor drops into E minor
+drone       | !pp F1w~ | F1w~ | F1w | !pp E1w~ |
+low         | !pp [F2 C3]w~ | [F2 C3]w~ | [F2 C3]w | [E2 B2]w~ |
+glass       | !pp [F3 Ab3 C4 G4]w~ | [F3 Ab3 C4 G4]w | [F3 A3 C4 G4]w | [E3 G3 B3 F#4]w |
+piano       | R | R | !mp C5q F5q A5q G5q | R |
+chime       | R | rh !pp G6q rq | R | R |
+piano.lo    | R | R | R | !pp [E1 B1]w |
+cello       | R | R | R | R |
+glass.mel   | R | R | R | R |
+heart.kick  | !p Xx.. .... Xx.. .... | % | % | % |
+// bars 5-8: the figure on bowed glass, slower; the fall on the cello
+glass       | !pp [E3 B3]w~ | [E3 B3]w | R | R |
+glass.mel   | !p D4h E4h | F#4w | R | R |
+cello       | R | R | !p E3h.~ E3q^ | Eb3w |
+drone       | E1w~ | E1w~ | E1w~ | E1w |
+low         | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w |
+piano       | R | R | R | R |
+chime       | R | R | R | rh rq !pp B6q |
+piano.lo    | R | R | R | !pp [E1 B1 F2]w |
+heart.kick  | Xx.. .... Xx.. .... | % | % | % |
+
+section Loop bars=8
+// the thought, round and round: D E F# against four beats, so each bar
+// starts on a different note; the heart doubles; the cello climbs toward
+// an A it never reaches; then everything stops
+tempo       | 60 | >63 | >66 | >69 | >72 | . | . | 58 |
+chime       | !p D6q E6q F#6q rq | D6q E6q F#6q D6q | !mp E6q F#6q D6q E6q | F#6q D6q E6q F#6q |
+chime       | !mf D6e E6e F#6e D6e E6e F#6e D6e E6e | F#6e D6e E6e F#6e D6e E6e F#6e re | R | R |
+piano       | R | R | R | R | !mp D5e E5e F#5e D5e E5e F#5e D5e E5e | F#5e D5e E5e F#5e D5e E5e F#5e re | rq !p E4h. | R |
+glass       | R | R | R | R | R | R | rq !mp E4h.~ | E4q^ Eb4h. |
+halo        | R | R | !pp [Eb5 E5]w~ | [Eb5 E5]w | !p [Eb5 E5]w~ | [Eb5 E5]w | R | R |
+cello       | !p E3w | F3w | F#3w | G3w | !mp G#3w~ | G#3w | R | R |
+low         | !p [E2 B2]w~ | [E2 B2]w~ | [E2 B2 E3]w~ | [E2 B2 E3]w | !p [E2 B2 E3]w~ | [E2 B2 E3]w | R | R |
+drone       | !p E1w~ | E1w~ | E1w~ | E1w | !mp E1w~ | E1w | R | R |
+piano.lo    | !p [E1 B1 F2]w | R | !mp [E1 B1 F2]w | R | !mf [E1 B1 F2]w | R | rq !p [E1 B1 F2]h. | R |
+heart.kick  | !p Xx.. .... Xx.. .... | % | !mp Xx.. Xx.. Xx.. Xx.. | % | !mf Xx.. Xx.. Xx.. Xx.. | % | R | !pp .... .... Xx.. .... |
+
+section After bars=8
+// the morning after the thought: the figure at half speed, the fall as a
+// plain wrong note, the sigh. The heartbeat skips once (bar 5) so that
+// its last beat falls 1.3 s before the end of the song
+drone       | !pp E1w~ | E1w~ | E1w~ | E1w~ | E1w~ | E1w~ | E1w~ | E1h rh |
+low         | !pp [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]w~ | [E2 B2]h rh |
+halo        | R | !pp E5w~ | E5w~ | E5w~ | E5w | R | R | R |
+piano       | R | R | !p D5h E5h | F#5w | rh !pp Eb4h | R | R | R |
+cello       | R | R | R | R | R | !pp E3h D#3h | E3h. rq | R |
+chime       | R | rh !pp B6q rq | R | R | R | R | rh rq !pp E7q | R |
+heart.kick  | !pp Xx.. .... Xx.. .... | % | % | % | Xx.. .... ...X x... | ...X x... ...X x... | % | % |
+
+form: Intro Thought Kitchen Loop After

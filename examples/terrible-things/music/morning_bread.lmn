@@ -1,0 +1,152 @@
+LMN 1
+title: Morning Bread
+artist: Shiori examples
+tempo: 156
+time: 6/8
+key: F major
+mood: sunny, bustling, teasing; flour in the air at five in the morning
+
+// ---------------------------------------------------------------------------
+// HINATA'S THEME. A 6/8 bakery jig: acoustic guitar, accordion, wooden flute,
+// hand claps and upright bass.
+//
+// TEMPO  tempo 156 is quarter notes per minute, so the dotted quarter (the
+//        felt 6/8 beat) is 104, as the brief asks (LMN-Spec 2.10).
+//
+// THE KITCHEN CHORD  Fadd9 voiced F3 A3 C4 G4 (the guitar's open Fadd9
+//        shape). Hinata's beads "ring together in a chord, always the same
+//        warm chord, like a kitchen". The guitar picks it in the first bar,
+//        the accordion holds it under the tune, and the song ends on it.
+//
+// HINATA'S TUNE  (the A strain, 16 bars; quoted in suzu_song and paper_lantern)
+//   The head climbs the kitchen chord and lands on its ninth:
+//     C5 F5 A5 G5 (four notes, all from F-A-C-G), then A G F C.
+//   Bars 5-6 put the same gesture on Bb (F Bb D, landing on C6).
+//   Bar 7 runs E F G toward the A that would make the chord warm again...
+//
+// THE TIRED BAR  ...and in bar 8 it does not get there. The flute freezes on
+//   G5 and the harmony underneath goes from Fadd9 to F minor add9 (F3 Ab3 C4
+//   G4): the kitchen chord with one note gone flat. The claps stop, the guitar
+//   strums once, the bass holds. Nothing resolves it. Bar 9 simply starts the
+//   tune again, grinning. ("For one second her face goes flat and white and
+//   far away... Then she's grinning again.") The same bar returns in every A
+//   section. Only at bar 16 does the run finally reach A5, over Fadd9.
+//
+// FORM  79 bars of 6/8 at q=156, about 1:31. The song ends on the kitchen
+//       chord held by the accordion; the Intro begins on the same chord on the
+//       guitar, so the loop comes round without a bump.
+//   Intro   4  guitar picks the kitchen chord; accordion breathes it in; bass,
+//              claps and a flute run-up join
+//   A1     16  flute: Hinata's tune. Accordion holds the chords, guitar picks
+//   B      16  the tease: the accordion sings a falling line in threes against
+//              the bass's twos (hemiola), with a cheeky II7 (G7, B natural);
+//              the flute joins in sixths, then leads a chromatic shimmy
+//              (A G# A, G F# G) with the accordion a third below
+//   A2     16  the accordion takes Hinata's tune; the flute answers in thirds
+//              below in the second half
+//   C       8  the soft Hinata ("You'd look nice in a hat"): the head slowed to
+//              half speed over Bbmaj7, no claps; claps fill back in
+//   A3     16  everyone: flute tune, accordion in thirds, strummed guitar,
+//              walking bass, clap-along on both beats. The tired bar still
+//              comes, the same as before
+//   Outro   3  the head once more, softly, and the kitchen chord held
+//
+// HARMONY (A strain)
+//   Fadd9 | Fadd9 | Gm7 | C7 | Bb(add9) | Am7 | Gm7 C7 | Fm(add9) |
+//   Fadd9 | Fadd9 | Gm7 | C7 | Bb(add9) | Am7 | Gm7 C7 | Fadd9    |
+// HARMONY (B strain)
+//   Bb(add9) | Fadd9 | Gm7 | C7 | Bb(add9) | Fadd9 | Dm7 | G7 |
+//   Bb(add9) | Fadd9 | Gm7 | C7 | Dm7      | Gm7   | F/C | C7 |
+// HARMONY (C)
+//   Bbmaj7 | Bbmaj7 | F/A | F/A | Gm7 | Am7 | Bbmaj7 | C7 |
+//
+// Accordion voicings stay inside F3-A4 and move by step from the kitchen
+// chord: Fadd9 F3 A3 C4 G4 · Gm7 F3 Bb3 D4 G4 · C7 E3 Bb3 C4 G4 ·
+// Bb(add9) F3 Bb3 C4 D4 · Am7 E3 A3 C4 G4 · Fm(add9) F3 Ab3 C4 G4.
+// (The C section keeps a dreamier Bbmaj7, F3 Bb3 D4 A4.)
+// ---------------------------------------------------------------------------
+
+track flute      flute            vol=80 pan=-12 reverb=30
+track accordion  accordion        vol=60 pan=22  reverb=26
+track guitar     acoustic_guitar  vol=60 pan=-28 reverb=22
+track bass       upright_bass     vol=76 pan=4   reverb=12
+track claps      percussion       vol=48 pan=14  reverb=28
+
+section Intro bars=4
+guitar      | !mp F3e A3e C4e G4e C4e A3e | % | G3e Bb3e D4e F4e D4e Bb3e | C3e G3e Bb3e E4e Bb3e G3e |
+accordion   | R | !pp [F3 A3 C4 G4]h. | !p [F3 Bb3 D4 G4]h. | [E3 Bb3 C4 G4]h. |
+bass        | R | R | !mp G1q. D2q. | C2q. D2q E2e |
+claps.clap  | R | R | !mp ... x.. | ... x.x |
+flute       | R | R | R | rq. !mp G4e A4e Bb4e |
+
+section A1 bars=16
+// bars 1-8: the tune, ending on the tired bar
+flute       | !mf C5e F5e A5e G5q. | A5q G5e F5q C5e | D5e F5e A5e G5q. | G5q F5e E5q C5e | F5e Bb5e D6e C6q. | C6q Bb5e A5q G5e | Bb5e A5e G5e E5e F5e G5e~ | G5h. |
+accordion   | !p [F3 A3 C4 G4]h.~ | [F3 A3 C4 G4]h. | [F3 Bb3 D4 G4]h. | [E3 Bb3 C4 G4]h. | [F3 Bb3 C4 D4]h. | [E3 A3 C4 G4]h. | [F3 Bb3 D4 G4]q. [E3 Bb3 C4 G4]q. | !pp [F3 Ab3 C4 G4]h. |
+guitar      | !mp F3e A3e C4e G4e C4e A3e | % | G3e Bb3e D4e F4e D4e Bb3e | C3e G3e Bb3e E4e Bb3e G3e | Bb2e F3e C4e D4e C4e F3e | A2e E3e G3e C4e G3e E3e | G3e Bb3e D4e E4e C4e Bb3e | !p [F3 Ab3 C4 G4]h. |
+bass        | !mf F2q. C2q. | F2q. A2q. | G2q. D2q. | C2q. G1q. | Bb1q. F2q. | A1q. E2q. | G1q. C2q. | !p F2h. |
+claps.clap  | !mf ... x.. | ... x.. | ... x.. | ... x.x | ... x.. | ... x.. | ... x.. | R |
+// bars 9-16: the grin comes back; this time the run reaches A
+flute       | !mf C5e F5e A5e G5q. | A5q G5e F5q C5e | D5e F5e A5e G5q. | G5q F5e E5q C5e | F5e Bb5e D6e C6q. | C6q Bb5e A5q G5e | Bb5e A5e G5e E5e F5e G5e | A5h. |
+accordion   | !p [F3 A3 C4 G4]h.~ | [F3 A3 C4 G4]h. | [F3 Bb3 D4 G4]h. | [E3 Bb3 C4 G4]h. | [F3 Bb3 C4 D4]h. | [E3 A3 C4 G4]h. | [F3 Bb3 D4 G4]q. [E3 Bb3 C4 G4]q. | [F3 A3 C4 G4]h. |
+guitar      | !mp F3e A3e C4e G4e C4e A3e | % | G3e Bb3e D4e F4e D4e Bb3e | C3e G3e Bb3e E4e Bb3e G3e | Bb2e F3e C4e D4e C4e F3e | A2e E3e G3e C4e G3e E3e | G3e Bb3e D4e E4e C4e Bb3e | F3e A3e C4e G4e C4e A3e |
+bass        | !mf F2q. C2q. | F2q. A2q. | G2q. D2q. | C2q. G1q. | Bb1q. F2q. | A1q. E2q. | G1q. C2q. | F2q. C2q A1e |
+claps.clap  | X.. x.. | ... x.. | ... x.. | ... x.x | ... x.. | ... x.. | ... x.. | ..x x.x |
+
+section B bars=16
+// bars 1-8: the accordion sings in threes against the bass's twos
+accordion   | !mf D5q C5q Bb4q | C5q Bb4q A4q | Bb4q A4q G4q | G4e A4e Bb4e C5q. | D5q C5q Bb4q | C5q Bb4q A4q | D5e E5e F5e A5q. | B5q. G5e F5e D5e |
+flute       | R | R | R | R | R | R | R | R |
+guitar      | !mp Bb2e F3e C4e D4e C4e F3e | F3e A3e C4e G4e C4e A3e | G3e Bb3e D4e F4e D4e Bb3e | C3e G3e Bb3e E4e Bb3e G3e | Bb2e F3e C4e D4e C4e F3e | F3e A3e C4e G4e C4e A3e | D3e A3e C4e F4e C4e A3e | G2e D3e F3e B3e F3e D3e |
+bass        | !mf Bb1q. F2q. | F2q. C2q. | G1q. D2q. | C2q. G1q A1e | Bb1q. F2q. | F2q. C2q. | D2q. A1q. | G1q. B1q. |
+claps.clap  | !mf ... x.o | ... x.o | ... x.o | ... x.x | ... x.o | ... x.o | ... x.o | ..x x.x |
+// bars 9-16: the flute joins a sixth above, then leads the shimmy
+accordion   | D5q C5q Bb4q | C5q Bb4q A4q | Bb4q A4q G4q | G4e A4e Bb4e C5q. | F5e E5e F5e A5q. | G5e F#5e G5e Bb5q. | A5q. G5e F5e E5e | A4e G4e F4e E4q. |
+flute       | !mp Bb5q A5q G5q | A5q G5q F5q | G5q F5q E5q | E5e F5e G5e A5q. | !mf A5e G#5e A5e C6q. | Bb5e A5e Bb5e D6q. | C6q. Bb5e A5e G5e | F5e E5e D5e C5q. |
+guitar      | Bb2e F3e C4e D4e C4e F3e | F3e A3e C4e G4e C4e A3e | G3e Bb3e D4e F4e D4e Bb3e | C3e G3e Bb3e E4e Bb3e G3e | D3e A3e C4e F4e C4e A3e | G3e Bb3e D4e F4e D4e Bb3e | C3e A3e C4e F4e C4e A3e | C3e G3e Bb3e E4e Bb3e G3e |
+bass        | Bb1q. F2q. | F2q. C2q. | G1q. D2q. | C2q. E2q. | D2q. A1q. | G1q. D2q. | C2q. G1q. | C2q. D2q E2e |
+claps.clap  | X.. x.o | ... x.o | ... x.o | ... x.x | ... x.o | ... x.o | ... x.o | x.x xxx |
+
+section A2 extends=A1
+// the accordion has the tune; guitar and bass as in A1
+accordion   | !mf C5e F5e A5e G5q. | A5q G5e F5q C5e | D5e F5e A5e G5q. | G5q F5e E5q C5e | F5e Bb5e D6e C6q. | C6q Bb5e A5q G5e | Bb5e A5e G5e E5e F5e G5e | !pp [F3 Ab3 C4 G4]h. |
+accordion   | !mf C5e F5e A5e G5q. | A5q G5e F5q C5e | D5e F5e A5e G5q. | G5q F5e E5q C5e | F5e Bb5e D6e C6q. | C6q Bb5e A5q G5e | Bb5e A5e G5e E5e F5e G5e | A5h. |
+// the flute keeps the tired bar's G, then answers in thirds below
+flute       | R | R | R | R | R | R | R | !mp G5h. |
+flute       | !p A4e C5e F5e C5q. | F5q E5e C5q A4e | Bb4e D5e F5e D5q. | E5q D5e C5q G4e | D5e F5e Bb5e A5q. | A5q G5e E5q E5e | G5e F5e D5e C5e D5e E5e | F5h. |
+claps.clap  | !mf X.. x.o | ... x.o | ... x.o | ... x.x | ... x.o | ... x.o | ... x.o | R |
+claps.clap  | X.. x.o | ... x.o | ... x.o | ... x.x | ... x.o | ... x.o | ... x.o | ..x x.x |
+
+section C bars=8
+// the head at half speed over Bbmaj7: the soft Hinata. No claps until the end
+flute       | !mp C5q F5q A5q | G5h. | A5h G5q | F5h C5q | D5q F5q A5q | G5h. | G5h F5q | E5q. G4e A4e Bb4e |
+accordion   | !pp [F3 Bb3 D4 A4]h.~ | [F3 Bb3 D4 A4]h. | [F3 A3 C4 G4]h.~ | [F3 A3 C4 G4]h. | [F3 Bb3 D4 G4]h. | [E3 A3 C4 G4]h. | [F3 Bb3 D4 A4]h. | !p [E3 Bb3 C4 G4]h. |
+guitar      | !p Bb2e F3e D4e A4e D4e F3e | % | A2e F3e C4e G4e C4e F3e | % | G3e Bb3e D4e F4e D4e Bb3e | A2e E3e G3e C4e G3e E3e | Bb2e F3e D4e A4e D4e F3e | !mp C3e G3e Bb3e E4e Bb3e G3e |
+bass        | !p Bb1h. | Bb1q. F2q. | A1h. | A1q. C2q. | G1h. | A1h. | Bb1h. | !mp C2q. D2q E2e |
+claps.clap  | R | R | R | R | R | R | !p ... x.. | !mf x.x xxx |
+
+section A3 bars=16
+// everyone. The tired bar is the same as ever
+flute       | !f C5e F5e A5e G5q. | A5q G5e F5q C5e | D5e F5e A5e G5q. | G5q F5e E5q C5e | F5e Bb5e D6e C6q. | C6q Bb5e A5q G5e | Bb5e A5e G5e E5e F5e G5e~ | G5h. |
+accordion   | !mf A4e C5e F5e C5q. | F5q E5e C5q A4e | Bb4e D5e F5e D5q. | E5q D5e C5q G4e | D5e F5e Bb5e A5q. | A5q G5e E5q E5e | G5e F5e D5e C5e D5e E5e | !pp [F3 Ab3 C4 G4]h. |
+guitar      | !p [C3 F3 A3 C4 G4]q> [C3 F3 A3 C4 G4]e' [C3 F3 A3 C4 G4]q [C3 F3 A3 C4 G4]e' | % | [D3 G3 Bb3 D4 F4]q> [D3 G3 Bb3 D4 F4]e' [D3 G3 Bb3 D4 F4]q [D3 G3 Bb3 D4 F4]e' | [C3 E3 Bb3 C4]q> [C3 E3 Bb3 C4]e' [C3 E3 Bb3 C4]q [C3 E3 Bb3 C4]e' |
+guitar      | [Bb2 F3 C4 D4]q> [Bb2 F3 C4 D4]e' [Bb2 F3 C4 D4]q [Bb2 F3 C4 D4]e' | [C3 E3 G3 C4]q> [C3 E3 G3 C4]e' [C3 E3 G3 C4]q [C3 E3 G3 C4]e' | [D3 G3 Bb3 D4 F4]q> [D3 G3 Bb3 D4 F4]e' [C3 E3 Bb3 C4]q> [C3 E3 Bb3 C4]e' | !p [F3 Ab3 C4 G4]h. |
+bass        | !mf F2q A2e C3q A2e | % | G2q Bb2e D3q Bb2e | C3q G2e E2q G2e | Bb2q F2e D2q F2e | A2q E2e C2q E2e | G2q D2e C2q E2e | !p F2h. |
+claps.clap  | !f X.o x.o | x.o x.o | x.o x.o | x.o x.x | x.o x.o | x.o x.o | x.o x.x | R |
+// bars 9-16
+flute       | !f C5e F5e A5e G5q. | A5q G5e F5q C5e | D5e F5e A5e G5q. | G5q F5e E5q C5e | F5e Bb5e D6e C6q. | C6q Bb5e A5q G5e | Bb5e A5e G5e E5e F5e G5e | A5h. |
+accordion   | !mf A4e C5e F5e C5q. | F5q E5e C5q A4e | Bb4e D5e F5e D5q. | E5q D5e C5q G4e | D5e F5e Bb5e A5q. | A5q G5e E5q E5e | G5e F5e D5e C5e D5e E5e | F5h. |
+guitar      | !p [C3 F3 A3 C4 G4]q> [C3 F3 A3 C4 G4]e' [C3 F3 A3 C4 G4]q [C3 F3 A3 C4 G4]e' | % | [D3 G3 Bb3 D4 F4]q> [D3 G3 Bb3 D4 F4]e' [D3 G3 Bb3 D4 F4]q [D3 G3 Bb3 D4 F4]e' | [C3 E3 Bb3 C4]q> [C3 E3 Bb3 C4]e' [C3 E3 Bb3 C4]q [C3 E3 Bb3 C4]e' |
+guitar      | [Bb2 F3 C4 D4]q> [Bb2 F3 C4 D4]e' [Bb2 F3 C4 D4]q [Bb2 F3 C4 D4]e' | [C3 E3 G3 C4]q> [C3 E3 G3 C4]e' [C3 E3 G3 C4]q [C3 E3 G3 C4]e' | [D3 G3 Bb3 D4 F4]q> [D3 G3 Bb3 D4 F4]e' [C3 E3 Bb3 C4]q> [C3 E3 Bb3 C4]e' | [C3 F3 A3 C4 G4]h. |
+bass        | !mf F2q A2e C3q A2e | % | G2q Bb2e D3q Bb2e | C3q G2e E2q G2e | Bb2q F2e D2q F2e | A2q E2e C2q E2e | G2q D2e C2q E2e | F2q. C2q. |
+claps.clap  | X.o x.o | x.o x.o | x.o x.o | x.o x.x | x.o x.o | x.o x.o | x.o x.x | X.. ... |
+
+section Outro bars=3
+// the head once more, softly; then the kitchen chord, held
+flute       | !mp C5e F5e A5e G5q.~ | G5h. | R |
+accordion   | !p [F3 A3 C4 G4]h.~ | [F3 A3 C4 G4]h.~ | [F3 A3 C4 G4]h. |
+guitar      | !mp F3e A3e C4e G4e C4e A3e | !p [F2 C3 F3 A3 C4 G4]h. | R |
+bass        | !mp F2q. C2q. | F2h. | R |
+claps.clap  | !mp ... x.. | R | R |
+
+form: Intro A1 B A2 C A3 Outro

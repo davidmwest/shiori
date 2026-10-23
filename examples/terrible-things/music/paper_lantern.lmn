@@ -1,0 +1,336 @@
+LMN 1
+title: Operation Paper Lantern
+artist: Shiori examples
+tempo: 144
+time: 4/4
+key: C major (trio in F major; the grandioso lifts to D major)
+mood: a caper on Lantern Night; fast, cheeky, more and more out of control, then a grand finish
+
+// ---------------------------------------------------------------------------
+// THE FESTIVAL HEIST. A comic brass march for a blind countess in oven mitts,
+// built like a Sousa march: first strain, second strain, trio in the
+// subdominant, a "dogfight" break strain, then the grandioso. Taiko and
+// shime-daiko (percussion lanes), shamisen (banjo), festival flute, piccolo,
+// woodblock and a brass band.
+//
+// SUZU'S FIGURE (LEITMOTIFS.md 1) is the march tune on trumpets. In C it is a
+// step down from the canonical pitches, with the same rhythm:
+//     C5q D5q E5q G5q | A5h. D5q~ | D5h ...     (do re mi sol | la . re~)
+// The falling note is never allowed to resolve. Each time it hangs over the
+// dominant (once over V of V) and the gang answers instead: a woodblock "tok, tok-tok" and a piccolo scurry.
+// It turns up four ways:
+//   A1/A2      the march tune, four quarters and the long top note
+//   Sneak      in A minor on tiptoe (A B C E | F | B), staccato trombone and
+//              pizzicato, then flute; it ends in a "wah-wah-wah-waaah"
+//   Dogfight   only the climb, in eighths, sequenced down a D C Bb A bass and
+//              then in sixteenths: the staircase that will not stop
+//   Grandioso  the march transposed up a step (transpose=2), so the figure
+//              sounds at its true pitch, D5 E5 F#5 A5 | B5 | E5, for the
+//              Countess's triumph. In the Tag she climbs once more, holds the
+//              B over A9, and this time leaps up to D6 instead of falling.
+//              (The E still never steps down to D: that is saved for suzu_song.)
+//
+// HINATA'S TUNE (HINATA.md) on accordion in the Trio, in F major at its own
+// pitch, using the 4/4 "half" version (triplet eighths keep the 6/8 lilt). The
+// shamisen picks her kitchen chord F3 A3 C4 G4 the way her guitar does. Her
+// tired bar (F minor add9, the tune frozen on G5) comes in each pass, played
+// by the accordion itself at pp, with the claps stopping. In the second pass
+// the flute adds her second voice a third below, and the last A5 is
+// hijacked: the chord under it turns to A7 and the dogfight starts in D minor.
+//
+// FORM  79 bars, about 2:10. Tempo 144, then 146, 144, 148 accelerating to 164
+//       in the dogfight, 152 for the grandioso, broadening to 116 at the end.
+//   Intro       4  taiko call, shamisen riff, a flute slide; bugle call
+//   A1         16  the march: figure x2 with answers; the boast; the figure
+//                  again too fast, a scramble to the top and a stop
+//   Sneak       8  the plan, on tiptoe; sad trombone
+//   A2          8  the march again, bigger: flute an octave up, piccolo
+//                  trills, trombone smears where the woodblock was
+//   Trio       16  Hinata's tune on accordion, twice
+//   Dogfight    8  the chase, accelerating, everything climbing at once
+//   Grandioso  16  A1 a step higher (D major) with full band, piccolo
+//                  obbligato, trombone counter-melody, glockenspiel glints
+//   Tag         3  the last climb, the held B, and the high D
+// The script cuts the cue with a 0.2 s fade at the handshake, so nothing
+// waits for a cadence; every section hands straight on to the next. The final
+// hit leaves three slow beats for the tails, and the loop restarts on taiko
+// alone, so the jump from D back to C is never heard as a wrong chord.
+//
+// HARMONY
+//   A1:   C | F | G7 | C | Am | F | D7 | G7 | F | C/E | Dm7 | G7 | C F | G7 | G7 | C
+//   Sneak: Am | F | E7 | Am | Am | F | E7 | E7
+//   A2:   C | F | G7 | C | Am | F | G7 | C7
+//   Trio: Fadd9 | Gm7 C7 | Bb(add9) Am7 | Gm7 C7 Fm(add9) |
+//         Fadd9 | Gm7 C7 | Bb(add9) Am7 | Gm7 C7 Fadd9      (2nd pass: ... A7)
+//   Dogfight: Dm Dm7 | C C7 | Bb | A A7 | Dm C | Bb A | A7 | A7
+//   Grandioso: A1 + 2 semitones.   Tag: G | A9 | D
+//
+// JOBS  tpt: the tune. tpt2: thirds and sixths under it. horns: the "pah" on
+// beats 2 and 4. tuba: the "oom". sham: running eighths (triplets in the trio).
+// picc: the gang's answers, trills and obbligato. fue: festival flute colour
+// and doubling. tbn: sneak tune, smears, counter-melodies. acc: Hinata, then
+// swept into the band's afterbeats for the chase and the triumph.
+// pizz: tiptoe. glock: lantern glints. taiko: kick = o-daiko, tom_low = taiko
+// "don", tom_mid = "doko" fills, tom_hi = shime-daiko, rim = "ka", woodblock,
+// clap. kit: march snare and cymbals.
+// ---------------------------------------------------------------------------
+
+track tpt    trumpet       vol=84 pan=-6  reverb=22
+track tpt2   trumpet       vol=60 pan=12  reverb=22
+track horns  brass         vol=50 pan=20  reverb=24
+track tbn    trombone      vol=64 pan=26  reverb=22
+track tuba   tuba          vol=76 pan=2   reverb=12
+track sham   banjo         vol=56 pan=-32 reverb=16
+track fue    flute         vol=62 pan=-18 reverb=30
+track picc   piccolo       vol=52 pan=30  reverb=26
+track acc    accordion     vol=68 pan=-12 reverb=24
+track pizz   pizzicato     vol=64 pan=-24 reverb=18
+track glock  glockenspiel  vol=42 pan=34  reverb=40
+track taiko  percussion    vol=82 pan=0   reverb=30
+track kit    drums         vol=58 pan=6   reverb=18
+
+section Intro bars=4
+// taiko alone, then the shamisen and a festival-flute slide; the bugle calls the march
+taiko.tom_low   | !f X... .... X... x.x. | X... .... X... .... | !mf x... ..x. x... ..x. | x... ..x. x.x. X... |
+taiko.kick      | !f X... .... X... .... | X... .... X... .... | !mf x... .... x... .... | x... .... x... X... |
+taiko.rim       | !mf .... x... .... .... | .... x.x. .... x.x. | .... x... .... x... | .... x... .... .... |
+taiko.tom_hi    | R | !p .... .... .... x.xx | x.x. x.x. x.x. x.x. | !mp x.xx x.xx !f xxxx xxxx |
+sham            | R | R | !mf C4e G4e C5e G4e C4e G4e C5e D5e | E5e D5e C5e G4e A4e G4e E4e G4e |
+fue             | R | R | !mf rh G5e^ C6q. | D6e C6e A5e G5e C6q rq |
+tpt             | R | R | R | rq !f G4e. G4s C5e. E5s G5q> |
+tpt2            | R | R | R | rq !mf E4e. E4s G4e. C5s E5q> |
+horns           | R | R | R | rh rq !mf [E4 G4 C5]q'> |
+tuba            | R | R | R | rh rq !f C2q> |
+kit.snare       | R | R | R | .... .... !mp xxxx !f xxxx |
+
+section A1 bars=16
+// bars 1-8: Suzu's figure on the trumpets, twice; the gang answers in the gaps
+tpt             | !f C5q> D5q E5q G5q | A5h.> D5q~ | D5h rh | R |
+tpt             | C5q> D5q E5q G5q | A5h.> D5q~ | D5h rh | R |
+tpt2            | !mf E4q G4q C5q E5q | F5h. F4q~ | F4h rh | R |
+tpt2            | E4q A4q C5q E5q | F5h. A4q~ | A4h rh | R |
+horns           | !mp rq [E4 G4 C5]q' rq [E4 G4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | rq [E4 G4 C5]q' rq [E4 G4 C5]q' |
+horns           | rq [E4 A4 C5]q' rq [E4 A4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F#4 A4 C5]q' rq [F#4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' |
+tuba            | !mf C2q rq G1q rq | F1q rq C2q rq | G1q rq D2q rq | C2q rq C2q B1q |
+tuba            | A1q rq E2q rq | F1q rq C2q rq | D2q rq A1q rq | G1q rq D2q E2q |
+sham            | !mp C4e G4e C5e G4e C4e G4e C5e G4e | C4e F4e A4e F4e C4e F4e A4e F4e | B3e D4e G4e D4e B3e D4e F4e D4e | C4e G4e C5e G4e C4e G4e C5e G4e |
+sham            | A3e E4e A4e E4e A3e E4e A4e E4e | C4e F4e A4e F4e C4e F4e A4e F4e | A3e D4e F#4e D4e A3e D4e C5e D4e | B3e D4e G4e D4e B3e D4e F4e D4e |
+picc            | R | R | R | !mf E6s D6s C6s D6s E6s G6s E6s D6s C6q' G5q' |
+picc            | R | R | R | B5s C6s D6s B5s G5s A5s B5s D6s G6q' rq |
+taiko.kick      | !mf x... .... x... .... | % | % | % | % | % | % | % |
+taiko.tom_low   | !f X... .... .... .... | R | R | .... .... .... x.x. | X... .... .... .... | R | R | .... .... .... x.x. |
+taiko.woodblock | R | R | !f .... .... x... x.x. | R | R | R | .... .... x... x.x. | R |
+kit.snare       | !mp x... x.xx x... x.xx | % | x... x.xx .... .... | x... x.xx x... x.xx | % | % | x... x.xx .... .... | x... x.xx x... x.xx |
+kit.crash       | !mf x... .... .... .... | R | R | R | x... .... .... .... | R | R | R |
+// bars 9-16: the Countess boasts, tries the figure again far too fast, and scrambles to the top
+tpt             | C6q. A5e F5q A5q | G5q. E5e C5q E5q | F5q. D5e A4q D5q | G5q F5q D5q B4q |
+tpt             | C5e D5e E5e G5e A5h> | D5h rh | G4s A4s B4s C5s D5s E5s F5s G5s A5e. B5s G5q | !ff C6q> rq rh |
+tpt2            | A5q. F5e C5q F5q | E5q. C5e G4q C5q | D5q. A4e F4q A4q | D5q B4q G4q F4q |
+tpt2            | E4e G4e C5e E5e F5h> | B4h rh | rh F5q D5q | !f E5q> rq rh |
+horns           | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [E4 G4 C5]q' rq [E4 G4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' |
+horns           | rq [E4 G4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | !f [E4 G4 C5]q'> rq rh |
+tuba            | F2q rq C2q rq | E2q rq C2q rq | D2q rq A1q rq | G1q rq G1q B1q |
+tuba            | C2q rq F1q rq | G1q rq D2q rq | G1q rq D2q B1q | !f C2q> rq rh |
+sham            | C4e F4e A4e F4e C4e F4e A4e F4e | E4e G4e C5e G4e E4e G4e C5e G4e | A3e D4e F4e D4e A3e D4e F4e D4e | B3e D4e G4e D4e B3e D4e F4e D4e |
+sham            | C4e G4e C5e G4e C4e F4e A4e F4e | B3e D4e G4e D4e B3e D4e F4e D4e | G3e B3e D4e F4e G4e B4e D5e F5e | !f [C4 G4 C5]q'> rq rh |
+picc            | R | R | R | R |
+picc            | R | R | !mf G5s A5s B5s C6s D6s E6s F6s G6s A6e. B6s G6q | !f C7q> rq rh |
+taiko.kick      | x... .... x... .... | % | % | % | % | % | x... x... x... x... | !f X... .... .... .... |
+taiko.tom_low   | X... .... .... .... | R | R | R | X... .... .... .... | R | x... x... x.x. x.x. | X... .... .... .... |
+taiko.woodblock | R | R | R | R | R | .... .... x... x.x. | R | R |
+kit.snare       | x... x.xx x... x.xx | % | % | % | % | x... x.xx .... .... | !mp xxxx xxxx !mf xxxx !f xxxx | X... .... .... .... |
+kit.crash       | x... .... .... .... | R | R | R | R | R | R | X... .... .... .... |
+
+section Sneak bars=8
+// the plan, on tiptoe: the figure turned minor (A B C E | F | B), trombone and pizzicato,
+// then the flute peeks out with it; the clock ticks; the trombone gives the game away
+tbn             | !mp A3q' B3q' C4q' E4q' | F4h.> B3q~ | B3h rh | R |
+tbn             | R | R | rh !mf B3q> Bb3q> | A3q> Ab3h. |
+pizz            | !mp A4q' B4q' C5q' E5q' | F5h.> B4q~ | B4h rh | R |
+pizz            | A4q' B4q' C5q' E5q' | F5h.> B4q~ | B4h rh | R |
+fue             | R | R | R | R |
+fue             | !mp A5q' B5q' C6q' E6q' | F6h. B5q~ | B5h rh | R |
+sham            | R | R | R | !mf re A4e' re G4e' E4e' D4e' C4q' |
+sham            | !p re [E4 A4]e' re [E4 A4]e' re [E4 A4]e' re [E4 A4]e' | re [F4 A4]e' re [F4 A4]e' re [F4 A4]e' re [F4 A4]e' | re [E4 G#4]e' re [E4 G#4]e' re [D4 G#4]e' re [D4 G#4]e' | R |
+tuba            | !p A1q' rq E1q' rq | F1q' rq C2q' rq | E1q' rq B1q' rq | A1q' rq E1q' rq |
+tuba            | A1q' rq E1q' rq | F1q' rq C2q' rq | E1q' rq B1q' rq | E1q' rq rh |
+taiko.woodblock | !mp x... .... x... .... | % | % | x... .... .... .... | x... .... x... .... | % | % | x... .... .... .... |
+taiko.rim       | !mp .... x... .... x... | % | % | R | .... x... .... x... | % | % | R |
+taiko.tom_low   | !mp x... .... .... .... | R | R | R | x... .... .... .... | R | R | R |
+kit.snare       | R | R | R | R | R | R | R | .... .... !p xxxx !f xxxx |
+
+section A2 bars=8 tempo=146
+// the march again, bigger and cheekier: flute an octave up, piccolo trills,
+// trombone smears where the woodblock answered; it swerves to C7 for the trio
+tpt             | !f C5q> D5q E5q G5q | A5h.> D5q~ | D5h rh | R |
+tpt             | C5q> D5q E5q G5q | A5h.> D5q~ | D5h rh | G5q> E5q C5q Bb4q |
+tpt2            | !mf E4q G4q C5q E5q | F5h. F4q~ | F4h rh | R |
+tpt2            | E4q A4q C5q E5q | F5h. F4q~ | F4h rh | E5q> C5q G4q E4q |
+fue             | !mf C6q D6q E6q G6q | A6h. D6q~ | D6h rh | R |
+fue             | C6q D6q E6q G6q | A6h. D6q~ | D6h rh | R |
+picc            | !mp E6e G6e E6e G6e E6e G6e E6e G6e | F6e A6e F6e A6e F6e A6e F6e A6e | G6e F6e D6e B5e rh | !mf E6s D6s C6s D6s E6s G6s E6s D6s C6q' G5q' |
+picc            | !mp E6e A6e E6e A6e E6e A6e E6e A6e | F6e A6e F6e A6e F6e A6e F6e A6e | G6e F6e D6e B5e rh | !mf C7s Bb6s G6s E6s C6s Bb5s G5s E5s C6q' rq |
+tbn             | !mf C3h E3h | F3h. rq | rh !f G2q^ G3q> | C3q' rq rh |
+tbn             | !mf A2h C3h | F3h. rq | rh !f G2q^ G3q> | C3q> rq C3q> rq |
+horns           | !mf rq [E4 G4 C5]q' rq [E4 G4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | rq [E4 G4 C5]q' rq [E4 G4 C5]q' |
+horns           | rq [E4 A4 C5]q' rq [E4 A4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | [E4 G4 Bb4]q'> rq [E4 G4 Bb4]q'> rq |
+tuba            | !mf C2q rq G1q rq | F1q rq C2q rq | G1q rq D2q rq | C2q rq C2q B1q |
+tuba            | A1q rq E2q rq | F1q rq C2q rq | G1q rq D2q rq | C2q> rq C2q> rq |
+sham            | !mf C4e G4e C5e G4e C4e G4e C5e G4e | C4e F4e A4e F4e C4e F4e A4e F4e | B3e D4e G4e D4e B3e D4e F4e D4e | C4e G4e C5e G4e C4e G4e C5e G4e |
+sham            | A3e E4e A4e E4e A3e E4e A4e E4e | C4e F4e A4e F4e C4e F4e A4e F4e | B3e D4e G4e D4e B3e D4e F4e D4e | C4e G4e Bb4e G4e C4e E4e G4e Bb4e |
+taiko.kick      | !f x... .... x... .... | % | % | % | % | % | % | % |
+taiko.tom_low   | !f X... .... .... .... | R | .... .... x.x. .... | R | X... .... .... .... | R | .... .... x.x. .... | X... .... X... .... |
+taiko.tom_hi    | !p x.x.*4 | % | % | % | % | % | % | x.x. x.x. x.x. .... |
+taiko.woodblock | R | R | !f .... .... x... x.x. | R | R | R | .... .... x... x.x. | R |
+kit.snare       | !mf x... x.xx x... x.xx | % | x... x.xx .... .... | x... x.xx x... x.xx | % | % | x... x.xx .... .... | x... x.xx x... .... |
+kit.crash       | !f X... .... .... .... | R | R | R | x... .... .... .... | R | R | R |
+
+section Trio bars=16 tempo=144
+// Hinata's tune pops up on the accordion over her own kitchen chord (the 4/4 "half"
+// version from HINATA.md). Bar 4 of each pass is her tired bar: the tune freezes on G5
+// and the accordion drops to F minor add9 at pp; the claps stop
+acc             | !mf C5e3 F5e3 A5e3 G5q A5q3 G5e3 F5q3 C5e3 | D5e3 F5e3 A5e3 G5q G5q3 F5e3 E5q3 C5e3 | F5e3 Bb5e3 D6e3 C6q C6q3 Bb5e3 A5q3 G5e3 | Bb5e3 A5e3 G5e3 E5e3 F5e3 G5e3~ !pp [F3 Ab3 C4 G4 G5]h |
+acc             | !mf C5e3 F5e3 A5e3 G5q A5q3 G5e3 F5q3 C5e3 | D5e3 F5e3 A5e3 G5q G5q3 F5e3 E5q3 C5e3 | F5e3 Bb5e3 D6e3 C6q C6q3 Bb5e3 A5q3 G5e3 | Bb5e3 A5e3 G5e3 E5e3 F5e3 G5e3 A5h |
+// second pass: the flute joins with her second voice, the horns hold her chords
+acc             | !f C5e3 F5e3 A5e3 G5q A5q3 G5e3 F5q3 C5e3 | D5e3 F5e3 A5e3 G5q G5q3 F5e3 E5q3 C5e3 | F5e3 Bb5e3 D6e3 C6q C6q3 Bb5e3 A5q3 G5e3 | Bb5e3 A5e3 G5e3 E5e3 F5e3 G5e3~ !pp [F3 Ab3 C4 G4 G5]h |
+acc             | !f C5e3 F5e3 A5e3 G5q A5q3 G5e3 F5q3 C5e3 | D5e3 F5e3 A5e3 G5q G5q3 F5e3 E5q3 C5e3 | F5e3 Bb5e3 D6e3 C6q C6q3 Bb5e3 A5q3 G5e3 | Bb5e3 A5e3 G5e3 E5e3 F5e3 G5e3 A5h> |
+fue             | R | R | R | R | R | R | R | R |
+fue             | !mp A4e3 C5e3 F5e3 C5q F5q3 E5e3 C5q3 A4e3 | Bb4e3 D5e3 F5e3 D5q E5q3 D5e3 C5q3 G4e3 | D5e3 F5e3 Bb5e3 A5q A5q3 G5e3 E5q3 E5e3 | G5e3 F5e3 D5e3 C5e3 D5e3 E5e3 rh |
+fue             | A4e3 C5e3 F5e3 C5q F5q3 E5e3 C5q3 A4e3 | Bb4e3 D5e3 F5e3 D5q E5q3 D5e3 C5q3 G4e3 | D5e3 F5e3 Bb5e3 A5q A5q3 G5e3 E5q3 E5e3 | G5e3 F5e3 D5e3 C5e3 D5e3 E5e3 !f C#5h |
+sham            | !mp F3e3 A3e3 C4e3 G4e3 C4e3 A3e3 F3e3 A3e3 C4e3 G4e3 C4e3 A3e3 | G3e3 Bb3e3 D4e3 F4e3 D4e3 Bb3e3 C3e3 G3e3 Bb3e3 E4e3 Bb3e3 G3e3 | F3e3 Bb3e3 C4e3 D4e3 C4e3 Bb3e3 A3e3 C4e3 E4e3 G4e3 E4e3 C4e3 | G3e3 Bb3e3 D4e3 E4e3 C4e3 Bb3e3 !p [F3 Ab3 C4 G4]h |
+sham            | !mp F3e3 A3e3 C4e3 G4e3 C4e3 A3e3 F3e3 A3e3 C4e3 G4e3 C4e3 A3e3 | G3e3 Bb3e3 D4e3 F4e3 D4e3 Bb3e3 C3e3 G3e3 Bb3e3 E4e3 Bb3e3 G3e3 | F3e3 Bb3e3 C4e3 D4e3 C4e3 Bb3e3 A3e3 C4e3 E4e3 G4e3 E4e3 C4e3 | G3e3 Bb3e3 D4e3 E4e3 C4e3 Bb3e3 F3e3 A3e3 C4e3 G4e3 C4e3 A3e3 |
+sham            | !mf F3e3 A3e3 C4e3 G4e3 C4e3 A3e3 F3e3 A3e3 C4e3 G4e3 C4e3 A3e3 | G3e3 Bb3e3 D4e3 F4e3 D4e3 Bb3e3 C3e3 G3e3 Bb3e3 E4e3 Bb3e3 G3e3 | F3e3 Bb3e3 C4e3 D4e3 C4e3 Bb3e3 A3e3 C4e3 E4e3 G4e3 E4e3 C4e3 | G3e3 Bb3e3 D4e3 E4e3 C4e3 Bb3e3 !p [F3 Ab3 C4 G4]h |
+sham            | !mf F3e3 A3e3 C4e3 G4e3 C4e3 A3e3 F3e3 A3e3 C4e3 G4e3 C4e3 A3e3 | G3e3 Bb3e3 D4e3 F4e3 D4e3 Bb3e3 C3e3 G3e3 Bb3e3 E4e3 Bb3e3 G3e3 | F3e3 Bb3e3 C4e3 D4e3 C4e3 Bb3e3 A3e3 C4e3 E4e3 G4e3 E4e3 C4e3 | G3e3 Bb3e3 D4e3 E4e3 C4e3 Bb3e3 !f [E3 G3 C#4 A4]q'> rq |
+horns           | R | R | R | R | R | R | R | R |
+horns           | !p [F3 A3 C4 G4]w | [F3 Bb3 D4 G4]h [E3 Bb3 C4 G4]h | [F3 Bb3 C4 D4]h [E3 A3 C4 G4]h | [F3 Bb3 D4 G4]q [E3 Bb3 C4 G4]q rh |
+horns           | [F3 A3 C4 G4]w | [F3 Bb3 D4 G4]h [E3 Bb3 C4 G4]h | [F3 Bb3 C4 D4]h [E3 A3 C4 G4]h | [F3 Bb3 D4 G4]q [E3 Bb3 C4 G4]q !f [E4 G4 C#5]q'> rq |
+tuba            | !mp F2q rq C2q rq | G1q rq C2q rq | Bb1q rq A1q rq | G1q C2q !p F2h |
+tuba            | !mp F2q rq C2q rq | G1q rq C2q rq | Bb1q rq A1q rq | G1q C2q F2q C2q |
+tuba            | !mf F2q rq C2q rq | G1q rq C2q rq | Bb1q rq A1q rq | G1q C2q !p F2h |
+tuba            | !mf F2q rq C2q rq | G1q rq C2q rq | Bb1q rq A1q rq | G1q C2q !f A1q> rq |
+tpt             | R | R | R | R | R | R | R | R |
+tpt             | R | R | R | R | R | R | R | rh !f E5q'> rq |
+tpt2            | R | R | R | R | R | R | R | R |
+tpt2            | R | R | R | R | R | R | R | rh !f C#5q'> rq |
+taiko.clap      | !mf ... x.. ... x.. | % | % | ... x.. ... ... | ... x.. ... x.. | % | % | ... x.. ... x.x |
+taiko.clap      | !f x.. x.. x.. x.. | % | % | x.. x.. ... ... | x.. x.. x.. x.. | % | % | x.. x.. ... ... |
+taiko.kick      | !mp x... .... x... .... | % | % | x... .... .... .... | x... .... x... .... | % | % | % |
+taiko.kick      | !mf x... .... x... .... | % | % | x... .... .... .... | x... .... x... .... | % | % | x... .... X... .... |
+taiko.tom_hi    | R | R | R | R | R | R | R | R |
+taiko.tom_hi    | !p x.x x.x x.x x.x | % | % | x.x x.x ... ... | x.x x.x x.x x.x | % | % | x.x x.x ... ... |
+kit.crash       | R | R | R | R | R | R | R | R |
+kit.crash       | !mp x... .... .... .... | R | R | R | R | R | R | R |
+kit.snare       | R | R | R | R | R | R | R | R |
+kit.snare       | R | R | R | R | R | R | R | .... .... !mf xxxx !f xxxx |
+
+section Dogfight bars=8 tempo=148
+tempo           | . | >152 | >156 | >160 | . | >164 | . | . |
+// the chase: Suzu's climb (minor, then major) sequenced down a D C Bb A bass while the
+// trombone falls; then twice as fast; then in sixteenths, the staircase that will not stop
+tpt             | !f D5e E5e F5e A5e D6q> rq | C5e D5e E5e G5e C6q> rq | Bb4e C5e D5e F5e Bb5q> rq | A4e B4e C#5e E5e A5q> rq |
+tpt             | !ff D5e E5e F5e A5e C5e D5e E5e G5e | Bb4e C5e D5e F5e A4e B4e C#5e E5e | A4s B4s C#5s E5s A4s B4s C#5s E5s A4s B4s C#5s E5s A5q> | A5h.> rq |
+tpt2            | !f D4e E4e F4e A4e D5q> rq | C4e D4e E4e G4e C5q> rq | Bb3e C4e D4e F4e Bb4q> rq | A3e B3e C#4e E4e A4q> rq |
+tpt2            | !ff D4e E4e F4e A4e C4e D4e E4e G4e | Bb3e C4e D4e F4e A3e B3e C#4e E4e | A3s B3s C#4s E4s A3s B3s C#4s E4s A3s B3s C#4s E4s E5q> | E5h.> rq |
+fue             | R | R | R | R |
+fue             | !f D6e E6e F6e A6e C6e D6e E6e G6e | Bb5e C6e D6e F6e A5e B5e C#6e E6e | A5s B5s C#6s E6s A5s B5s C#6s E6s A5s B5s C#6s E6s A6q> | A6h.> rq |
+picc            | !f rh rq D7s A6s F6s D6s | rh rq C7s G6s E6s C6s | rh rq Bb6s F6s D6s Bb5s | rh rq A6s E6s C#6s A5s |
+picc            | !ff (A6s G6s)*8 | (Bb6s C7s)*4 (A6s B6s)*4 | A6s B6s C#7s E7s A6s B6s C#7s E7s A6s B6s C#7s E7s A7q> | (A6s B6s)*6 rq |
+tbn             | !f D4h C4h | C4h Bb3h | Bb3w | A3h G3h |
+tbn             | !ff D4h C4h | Bb3h A3h | A2e A2e C#3e C#3e E3e E3e G3e G3e | A2h.^ A3q> |
+acc             | !mf rq [D4 F4 A4]q' rq [C4 F4 A4]q' | rq [E4 G4 C5]q' rq [E4 G4 Bb4]q' | rq [D4 F4 Bb4]q' rq [D4 F4 Bb4]q' | rq [C#4 E4 A4]q' rq [C#4 E4 G4]q' |
+acc             | !f rq [D4 F4 A4]q' rq [E4 G4 C5]q' | rq [D4 F4 Bb4]q' rq [C#4 E4 A4]q' | re [C#4 E4 G4 A4]e' re [C#4 E4 G4 A4]e' re [C#4 E4 G4 A4]e' re [C#4 E4 G4 A4]e' | [C#4 E4 G4 A4]h.> rq |
+horns           | R | R | R | R |
+horns           | !f [D4 F4 A4]q'> rq [E4 G4 C5]q'> rq | [D4 F4 Bb4]q'> rq [C#4 E4 A4]q'> rq | [C#4 E4 G4 A4]q'> [C#4 E4 G4 A4]q'> [C#4 E4 G4 A4]q'> [C#4 E4 G4 A4]q'> | !ff [C#4 E4 G4 A4]h.> rq |
+tuba            | !f D2q rq A1q rq | C2q rq G1q rq | Bb1q rq F1q rq | A1q rq E1q rq |
+tuba            | !ff D2q A1q C2q G1q | Bb1q F1q A1q E1q | A1e A1e A1e A1e A1e A1e A1e A1e | A1h.> rq |
+sham            | !mf D4e A4e D5e A4e D4e A4e D5e A4e | C4e G4e C5e G4e C4e G4e C5e G4e | Bb3e F4e Bb4e F4e Bb3e F4e Bb4e F4e | A3e E4e A4e E4e A3e E4e A4e E4e |
+sham            | !f D4s A4s D5s A4s D4s A4s D5s A4s C4s G4s C5s G4s C4s G4s C5s G4s | Bb3s F4s Bb4s F4s Bb3s F4s Bb4s F4s A3s E4s A4s E4s A3s E4s A4s E4s | (A3s C#4s E4s G4s)*4 | [A3 E4 A4 C#5]h.> rq |
+taiko.kick      | !f x... x... x... x... | % | % | % | % | % | x.x. x.x. x.x. x.x. | X... .... .... .... |
+taiko.tom_low   | !f X... ..x. X... ..x. | % | % | % | X..x ..x. X..x ..x. | % | x.x. x.x. x.x. x.x. | X... .... .... x.x. |
+taiko.tom_mid   | R | R | R | R | R | R | R | !f .... .... .... ..xx |
+taiko.tom_hi    | !mp x.x.*4 | % | % | % | !mf xxxx*4 | % | % | !f xxxxxxxx xxxxxxxx xxxxxxxx .... |
+taiko.woodblock | R | R | R | R | !f x.x. x.x. x.x. x.x. | % | R | R |
+kit.snare       | !mf x... x.xx x... x.xx | % | % | x... x.xx xxxx xxxx | !f x.xx x.xx x.xx x.xx | % | xxxx xxxx xxxx xxxx | !mp xxxxxxxx !mf xxxxxxxx !ff xxxxxxxx .... |
+kit.crash       | !f X... .... .... .... | R | R | R | X... .... .... .... | R | X... .... .... .... | R |
+
+section Grandioso extends=A1 transpose=2 tempo=152
+// the Countess's triumph: A1 a step higher, so the figure sounds at its true pitch
+// (D5 E5 F#5 A5 | B5 | E5). Written in C like A1; transpose=2 lifts every new line too
+// the band, louder than in A1 (same notes)
+tpt             | !ff C5q> D5q E5q G5q | A5h.> D5q~ | D5h rh | R |
+tpt             | C5q> D5q E5q G5q | A5h.> D5q~ | D5h rh | R |
+tpt2            | !f E4q G4q C5q E5q | F5h. F4q~ | F4h rh | R |
+tpt2            | E4q A4q C5q E5q | F5h. A4q~ | A4h rh | R |
+horns           | !mf rq [E4 G4 C5]q' rq [E4 G4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | rq [E4 G4 C5]q' rq [E4 G4 C5]q' |
+horns           | rq [E4 A4 C5]q' rq [E4 A4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F#4 A4 C5]q' rq [F#4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' |
+tuba            | !f C2q rq G1q rq | F1q rq C2q rq | G1q rq D2q rq | C2q rq C2q B1q |
+tuba            | A1q rq E2q rq | F1q rq C2q rq | D2q rq A1q rq | G1q rq D2q E2q |
+sham            | !mf C4e G4e C5e G4e C4e G4e C5e G4e | C4e F4e A4e F4e C4e F4e A4e F4e | B3e D4e G4e D4e B3e D4e F4e D4e | C4e G4e C5e G4e C4e G4e C5e G4e |
+sham            | A3e E4e A4e E4e A3e E4e A4e E4e | C4e F4e A4e F4e C4e F4e A4e F4e | A3e D4e F#4e D4e A3e D4e C5e D4e | B3e D4e G4e D4e B3e D4e F4e D4e |
+tpt             | C6q. A5e F5q A5q | G5q. E5e C5q E5q | F5q. D5e A4q D5q | G5q F5q D5q B4q |
+tpt             | C5e D5e E5e G5e A5h> | D5h rh | G4s A4s B4s C5s D5s E5s F5s G5s A5e. B5s G5q | C6q> rq rh |
+tpt2            | A5q. F5e C5q F5q | E5q. C5e G4q C5q | D5q. A4e F4q A4q | D5q B4q G4q F4q |
+tpt2            | E4e G4e C5e E5e F5h> | B4h rh | rh F5q D5q | E5q> rq rh |
+horns           | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [E4 G4 C5]q' rq [E4 G4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' |
+horns           | rq [E4 G4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | !f [E4 G4 C5]q'> rq rh |
+tuba            | F2q rq C2q rq | E2q rq C2q rq | D2q rq A1q rq | G1q rq G1q B1q |
+tuba            | C2q rq F1q rq | G1q rq D2q rq | G1q rq D2q B1q | !ff C2q> rq rh |
+sham            | C4e F4e A4e F4e C4e F4e A4e F4e | E4e G4e C5e G4e E4e G4e C5e G4e | A3e D4e F4e D4e A3e D4e F4e D4e | B3e D4e G4e D4e B3e D4e F4e D4e |
+sham            | C4e G4e C5e G4e C4e F4e A4e F4e | B3e D4e G4e D4e B3e D4e F4e D4e | G3e B3e D4e F4e G4e B4e D5e F5e | !f [C4 G4 C5]q'> rq rh |
+fue             | !f C6q D6q E6q G6q | A6h. D6q~ | D6h rh | R |
+fue             | C6q D6q E6q G6q | A6h. D6q~ | D6h rh | R |
+fue             | C6q. A5e F5q A5q | G5q. E5e C5q E5q | F5q. D5e A4q D5q | G5q F5q D5q B4q |
+fue             | C6e D6e E6e G6e A6h | D6h rh | G4s A4s B4s C5s D5s E5s F5s G5s A5e. B5s G5q | C6q> rq rh |
+picc            | !f G6e E6e C6e E6e G6e C7e G6e E6e | F6e A6e C7e A6e F6e A6e C7e A6e | B6e G6e D6e G6e rh | E6s D6s C6s D6s E6s G6s E6s D6s C6q' G5q' |
+picc            | A6e E6e C6e E6e A6e C7e A6e E6e | F6e A6e C7e A6e F6e A6e C7e A6e | F#6e D6e A5e D6e rh | B5s C6s D6s B5s G5s A5s B5s D6s G6q' rq |
+picc            | C7h. A6q | G6h. E6q | F6h. D6q | G6s F6s D6s B5s G6s F6s D6s B5s G6s F6s D6s B5s G5q' |
+picc            | E6s G6s E6s G6s E6s G6s E6s G6s F6s A6s F6s A6s F6s A6s F6s A6s | D6s G6s B6s D7s G6q' rh | G5s A5s B5s C6s D6s E6s F6s G6s A6e. B6s G6q | C7q> rq rh |
+tbn             | !f E3h G3h | F3q G3q A3q C4q | D4h rh | C4q' rq rh |
+tbn             | E3h A3h | F3q G3q A3q C4q | D4h. C4q | B3q' rq rh |
+tbn             | A3w | G3w | F3w | G3h F3h |
+tbn             | E3h F3h | G3h rh | G2s A2s B2s C3s D3s E3s F3s G3s A3e. B3s G3q | !ff C4q> rq rh |
+acc             | !mf rq [E4 G4 C5]q' rq [E4 G4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | rq [E4 G4 C5]q' rq [E4 G4 C5]q' |
+acc             | rq [E4 A4 C5]q' rq [E4 A4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F#4 A4 C5]q' rq [F#4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' |
+acc             | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [E4 G4 C5]q' rq [E4 G4 C5]q' | rq [F4 A4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' |
+acc             | rq [E4 G4 C5]q' rq [F4 A4 C5]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | rq [F4 G4 B4]q' rq [F4 G4 B4]q' | !f [E4 G4 C5]q'> rq rh |
+glock           | R | !mf A6q rq rh | R | R | R | A6q rq rh | R | R |
+glock           | C7q rq rh | G6q rq rh | F6q rq rh | R | rh A6q rq | R | R | !f C7q> rq rh |
+taiko.kick      | !f x... x... x... x... | % | % | % | % | % | % | % |
+taiko.kick      | % | % | % | % | % | % | % | X... .... .... .... |
+taiko.tom_low   | !ff X... .... .... .... | X... .... .... .... | X... .... X... x.x. | X... .... .... .... | X... .... .... .... | X... .... .... .... | X... .... X... x.x. | X... .... .... .... |
+taiko.tom_low   | X... .... .... .... | X... .... .... .... | X... .... .... .... | X... .... x.x. x.x. | X... .... .... .... | X... .... X... x.x. | x.x. x.x. x.x. x.x. | X... .... .... .... |
+taiko.tom_mid   | R | R | R | R | R | R | R | R |
+taiko.tom_mid   | R | R | R | R | R | R | R | !f .... .... x.x. x.xx |
+taiko.tom_hi    | !mp x.x.*4 | % | % | % | % | % | % | % |
+taiko.tom_hi    | % | % | % | % | % | % | !f xxxx*4 | .... .... xxxx xxxx |
+taiko.woodblock | R | R | !f .... .... x... x.x. | R | R | R | .... .... x... x.x. | R |
+taiko.woodblock | R | R | R | R | R | .... .... x... x.x. | R | R |
+kit.snare       | !f x... x.xx x... x.xx | % | x... x.xx .... .... | x... x.xx x... x.xx | % | % | x... x.xx .... .... | x... x.xx x... x.xx |
+kit.snare       | x... x.xx x... x.xx | % | % | % | % | x... x.xx .... .... | !f xxxx xxxx !ff xxxx xxxx | X... .... .... .... |
+kit.crash       | !ff X... .... .... .... | R | R | R | X... .... .... .... | R | R | R |
+kit.crash       | X... .... .... .... | R | R | R | X... .... .... .... | R | R | X... .... .... .... |
+kit.splash      | !mp .... x... .... x... | % | % | % | % | % | % | % |
+kit.splash      | % | % | % | % | % | % | % | R |
+
+section Tag bars=3 transpose=2 tempo=146
+tempo           | >134 | >122 | 116 |
+// once more, broadly: the climb over IV, the top note held over A9, and this time
+// she does not fall: she leaps up to the high D
+tpt             | !ff C5q> D5q> E5q> G5q> | A5w | C6q> rq rh |
+tpt2            | !f A4q> A4q> A4q> C5q> | F5w | E5q> rq rh |
+fue             | !f C6q D6q E6q G6q | A6w | E6q> rq rh |
+picc            | R | !f A6s B6s A6s B6s A6s B6s A6s B6s A6s B6s A6s B6s A6s B6s A6s B6s | !ff C7q> rq rh |
+horns           | !f [F3 A3 C4 F4]w | [G3 B3 D4 F4]w | !ff [E4 G4 C5]q> rq rh |
+acc             | !f [F4 A4 C5]w | [G4 B4 D5]w | [E4 G4 C5]q> rq rh |
+tbn             | !f F3h A3h | G3h. G2q^ | !ff C4q> rq rh |
+tuba            | !f F1h F2h | G1h G2h | !ff C2q> rq rh |
+sham            | !f (F3s A3s C4s F4s)*4 | (G3s B3s D4s F4s)*4 | [C4 G4 C5 E5]q> rq rh |
+glock           | R | !mf A6q rq rh | !f C7q> rq rh |
+taiko.kick      | !ff x... x... x... x... | R | X... .... .... .... |
+taiko.tom_low   | !ff X... .... X... .... | !mf xxxx !f xxxx xxxx !ff xxxx | X... .... .... .... |
+taiko.tom_hi    | !f xxxx*4 | xxxxxxxx*4 | R |
+kit.snare       | !f xxxx*4 | !mf xxxxxxxx xxxxxxxx !f xxxxxxxx !ff xxxxxxxx | X... .... .... .... |
+kit.crash       | !ff X... .... .... .... | R | X... .... .... .... |
+kit.crash2      | R | R | !ff X... .... .... .... |
+
+form: Intro A1 Sneak A2 Trio Dogfight Grandioso Tag

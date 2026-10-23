@@ -1,0 +1,296 @@
+LMN 1
+title: All the Terrible Things (Suzu's Song)
+artist: Shiori examples
+tempo: 66
+time: 4/4
+key: D major
+mood: the culmination; a hymn made of everyone's worst thoughts that is the most beautiful thing in the town; grief and release
+
+// ---------------------------------------------------------------------------
+// ALL THE TERRIBLE THINGS (Suzu's Song). The true ending, from the moment
+// Suzu lets go through the whole epilogue. About 3:45; it loops back to the
+// solo glass harmonica.
+//
+// SUZU'S FIGURE, COMPLETE. Every other cue hides, mocks, marches or breaks
+// the figure and leaves its falling E hanging. Here it is the first line of a
+// whole song, and we finally hear what comes after it. The hymn is pure
+// D-major pentatonic (D E F# A B, the notes of the beads; no G, no C#), in
+// the four-line shoka shape a whole town can hum (ki, sho, ten, ketsu):
+//
+//   ki     D5q E5q F#5q A5q | B5h. E5q~ | E5w | (rest)        the figure, canonical
+//   sho    D5q E5q F#5q A5q | B5q. A5e B5q D6q | A5w~ | A5h   she climbs one step further
+//   ten    D6h B5q D6q | E6h. D6q | B5q. A5e F#5q A5q | B5w  the summit: the E she always
+//                                                           fell to, now reached from below
+//   ketsu  D5q E5q F#5q A5q | B5h. E5q~ | E5w | (rest)      the figure again
+//
+// THE FALLING E NEVER STEPS TO D until the last chord (bar 58), as
+// LEITMOTIFS.md asks. Each time it falls it lands on a different floor:
+// Em7 (verse 1, after the bare octaves), Fadd9 (verse 2), C (bVII, climax),
+// and at the end it is held for three bars over Fadd9 -> G -> Gm6
+// (bIII - IV - iv) before it falls to D. The glass harmonica takes that last step itself, with the cello
+// (Hinata) stepping E -> D an octave below: they come home together.
+//
+// HINATA'S KITCHEN CHORD  Fadd9, voiced F3 A3 C4 G4 on the accordion as in
+// morning_bread. It sits under the falling E (E over F = Fmaj9, no clash)
+// in verse 2, the climax and the coda. Her tune (C5 F5 A5 G5, the head in
+// HINATA.md's slow 4/4 mapping) is the counter-melody over it: the cello
+// sings it an octave down under Suzu's held E (so F4 sits a major 7th below
+// E5), then the flute sings it at its own pitch in the bar where Suzu rests.
+// The Bridge lets her tune bend into Suzu's key (C becomes C#). In the coda
+// the horns and cellos play it under the last E, and her line ends on E,
+// Suzu's note, before both step down to D. Neither wins.
+//
+// THE WIND CHIME  After the D chord is released, one glass chime: a
+// glockenspiel D6 and a softer C#6 a triplet-eighth later, as if the crooked
+// clapper hit a second, flat tube. LMN has no microtones, so "a little flat"
+// is a tube that rings a semitone under the home note. It is the last sound;
+// the loop's first note (the glass D5) is where it was heading.
+//
+// FORM  60 bars of 4/4, 66 bpm, broadening to 48 at the end; about 3:43
+//   Prelude    1-4   solo glass harmonica (celesta strike, ocarina tone,
+//                    halo bloom): the figure, then a silence
+//   V1 ki      5-8   the town lines it out: wordless choir in octaves, alone
+//   V1 sho     9-12  glass and choir together; the strings enter, pp
+//   V1 ten    13-16  piano arpeggios and the cello's counter-line join
+//   V1 ketsu  17-20  everyone so far; half cadence on A7
+//   Bridge    21-24  Hinata: flute over the accordion's kitchen chord and a
+//                    harp picking her guitar shape; her tune bends into D
+//   V2 ki     25-28  strings take the hymn; the figure's E falls onto Fadd9;
+//                    cello sings her head under it, then the flute
+//   V2 sho/ten 29-36 strings, choir, violas an octave below at the summit
+//   V2 ketsu  37-40  the glass returns; Fadd9 again; timpani, harp, flute
+//   Climax    41-54  tutti with tubular bells and timpani; summit E6 at bar 50
+//   Coda      55-60  E held over Fadd9 (Hinata on horns and cellos), G, Gm6;
+//                    the glass falls to D; then the wind chime
+//
+// HARMONY (a slash shows the bass)
+//   V1 ki: bare octaves in the choir; A7sus4 A7 in the silence of bar 8
+//   sho:   D Bm7 | G Em7 | F#m7 Bm7 | Em7 A7sus4
+//   ten:   Gmaj7 | A . . A7sus4 | F#m7 | Bm7 Bm7/A
+//   ketsu: Gmaj7 | D/F# | Em7 | A7sus4 A7        (glass_hill's harmony for the figure)
+//   Bridge: Fadd9 | Fadd9 | G7 | A7sus4 A7
+//   Verse 2: ki  D A/C# Bm D/A | G . . Fadd9 | Fadd9 | Fadd9   (F -> D lift)
+//            ketsu Gmaj7 | D/F# . . Fadd9 | Fadd9 | Fadd9
+//   Climax ki: D A/C# Bm D/A | G . . C | C | A7sus4 A7
+//   Coda:   Fadd9 | G (G7 colour) | Gm6 | D | D | (chime)
+// ---------------------------------------------------------------------------
+
+track beads      celesta        vol=64 pan=16  reverb=60
+track glass      ocarina        vol=60 pan=8   reverb=65
+track halo       halo_pad       vol=34 pan=-4  reverb=75
+track choir      choir          vol=58 pan=-4  reverb=60
+track strings    strings        vol=70 pan=-12 reverb=50
+track cello      cello          vol=64 pan=22  reverb=45
+track cbass      contrabass     vol=58 pan=6   reverb=40
+track piano      piano          vol=56 pan=-22 reverb=45
+track harp       harp           vol=50 pan=-32 reverb=50
+track flute      flute          vol=72 pan=-16 reverb=40
+track accordion  accordion      vol=40 pan=26  reverb=45
+track horns      french_horn    vol=54 pan=30  reverb=50
+track bells      tubular_bells  vol=44 pan=-26 reverb=65
+track timp       timpani        vol=46 pan=-6  reverb=55
+track chime      glockenspiel   vol=50 pan=36  reverb=70
+
+// ---- Prelude: the beads, alone --------------------------------------------
+section Prelude bars=4
+beads       | !mf D5q E5q F#5q A5q | B5h. E5q~ | E5w | R |
+glass       | !mp D5q E5q F#5q A5q | B5h. E5q~ | E5w | R |
+halo        | !pp D5q E5q F#5q A5q | B5h. E5q~ | E5w~ | E5h rh |
+
+// ---- Verse 1 ---------------------------------------------------------------
+section V1_Ki bars=4
+// the town lines it out, in octaves; the first chord comes in the silence
+choir.hi    | !mp D5q:ah E5q F#5q A5q | B5h. E5q~ | E5w | R |
+choir.mel   | !mp D4q:ah E4q F#4q A4q | B4h. E4q~ | E4w | R |
+choir       | R | R | R | !pp [G3 D4 E4]h:ah [G3 C#4 E4]h |
+cbass       | R | R | R | !pp A1w |
+
+section V1_Sho bars=4
+// glass and town together; strings enter under them
+beads       | !mf D5q E5q F#5q A5q | B5q. A5e B5q D6q | A5w~ | A5h rh |
+glass       | !mp D5q E5q F#5q A5q | B5q. A5e B5q D6q | A5w~ | A5h rh |
+halo        | !pp F#5w | G5w | E5h F#5h | G5h E5h |
+choir.mel   | !mp D4q:ah E4q F#4q A4q | B4q. A4e B4q D5q | A4w~ | A4h rh |
+choir       | !pp [A3 D4 F#4]w:ah | [B3 D4 G4]w | [A3 C#4 E4]h [A3 D4 F#4]h | [G3 B3 D4]h [G3 D4 E4]h |
+strings     | !pp [F#3 A3]w | [G3 B3]w | [E3 A3]h [F#3 A3]h | [E3 G3]w |
+cbass       | !p D2h B1h | G1h E1h | F#1h B1h | E1h A1h |
+
+section V1_Ten bars=4
+// the summit for the first time; piano and cello join
+beads       | !mf D6h B5q D6q | E6h. D6q | B5q. A5e F#5q A5q | B5w |
+glass       | !mf D6h B5q D6q | E6h. D6q | B5q. A5e F#5q A5q | B5w |
+choir.mel   | !mp D5h:ah B4q D5q | E5h. D5q | B4q. A4e F#4q A4q | B4w |
+choir       | !p [B3 D4 F#4]w:ah | [A3 C#4 E4]h. [G3 D4 E4]q | [A3 C#4 E4]w | [B3 D4 F#4]h [A3 D4 F#4]h |
+strings     | !p [B4 D5 F#5]w | [A4 C#5 E5]h. [A4 D5 E5]q | [A4 C#5 E5]w | [B4 D5 F#5]h [A4 D5 F#5]h |
+cello       | !p D4h B3h | A3q B3q C#4q D4q | C#4w | D4q B3q A3q F#3q |
+cbass       | !p G1w | A1w | F#1w | B1h A1h |
+piano.lh    | !p G1e D2e B2e F#3e A3e F#3e D3e B2e | A1e E2e A2e C#3e E3e C#3e D3e E3e | F#1e C#2e F#2e A2e C#3e E3e C#3e A2e | B1e F#2e B2e D3e A1e F#2e A2e D3e |
+harp        | R | !p rq A4e C#5e E5e A5e rq | R | rq B4e D5e F#5e B5e rq |
+
+section V1_Ketsu bars=4
+// the figure once more, with everyone so far; half cadence on A7
+beads       | !mf D5q E5q F#5q A5q | B5h. E5q~ | E5w | R |
+glass       | !mf D5q E5q F#5q A5q | B5h. E5q~ | E5w | R |
+halo        | !p D5q E5q F#5q A5q | B5h. E5q~ | E5w~ | E5h rh |
+choir.hi    | !mp D5q:ah E5q F#5q A5q | B5h. E5q~ | E5w | R |
+choir.mel   | !mp D4q:ah E4q F#4q A4q | B4h. E4q~ | E4w | R |
+choir       | !p [B3 D4 F#4]w:ah | [A3 D4 F#4]w | [G3 B3 D4]w | [G3 D4 E4]h [G3 C#4 E4]h |
+strings     | !mp [D4 F#4 B4]w | [D4 F#4 A4]w | [D4 G4 B4]w | [D4 E4 G4]h [C#4 E4 G4]h |
+cello       | !mp B3h A3h | F#3h. E3q~ | E3h B3h | A3w |
+cbass       | !mp G1w | F#1w | E1w | A1w |
+piano.lh    | !p G1e D2e B2e F#3e A3e F#3e D3e B2e | F#1e D2e A2e D3e F#3e D3e A2e D2e | E1e B1e E2e G2e B2e D3e B2e G2e | A1e E2e A2e D3e A1e E2e G2e C#3e |
+harp        | R | R | !p rq E4e G4e B4e E5e rq | rh rq !mp A3t C#4t E4t G4t A4t C#5t E5t G5t |
+
+// ---- Bridge: Hinata (the kitchen) ------------------------------------------
+section Bridge bars=4
+// her tune at its own pitch over her chord; bars 3-4 bend it into D
+flute       | !mp C5q3 F5q3 A5q3 G5h | A5h3 G5q3 F5h3 C5q3 | D5q3 F5q3 A5q3 G5h | G5h3 F#5q3 E5h3 C#5q3 |
+accordion   | !p [F3 A3 C4 G4]w~ | [F3 A3 C4 G4]w | [F3 B3 D4 G4]w | [E3 A3 D4 G4]h [E3 A3 C#4 G4]h |
+harp        | !p F2e C3e F3e A3e C4e G4e C4e A3e | F2e C3e F3e A3e C4e G4e C4e A3e | G1e D2e G2e B2e D3e F3e D3e B2e | A1e E2e A2e D3e A1e E2e G2e C#3e |
+cbass       | !p F1w | F1w | G1w | A1w |
+
+// ---- Verse 2: the braid ------------------------------------------------------
+section V2_Ki bars=4
+// strings sing the hymn; the E falls onto Fadd9. Hinata's head: cello under
+// the held E, then the flute at pitch in the bar where Suzu rests while the
+// cello goes on with her second bar (a canon on her own tune, inside her chord)
+strings     | !mp D5q E5q F#5q A5q | B5h. E5q~ | E5w | R |
+beads       | !mp D6q E6q F#6q A6q | B6h. E6q~ | E6w | R |
+choir       | !p [A3 D4 F#4]q:ah [A3 C#4 E4]q [B3 D4 F#4]q [A3 D4 F#4]q | [B3 D4 G4]h. [A3 C4 F4]q | [A3 C4 G4]w | [A3 C4 G4]w |
+cello       | !mp F#3q E3q D3q F#3q | B2h. A2q | !mf C4q3 F4q3 A4q3 G4h | !mp A4h3 G4q3 F4h3 C4q3 |
+cbass       | !mp D2q C#2q B1q A1q | G1h. F1q~ | F1w~ | F1w |
+accordion   | R | !p rh. [F3 A3 C4 G4]q~ | [F3 A3 C4 G4]w~ | [F3 A3 C4 G4]w |
+flute       | R | R | R | !mp C5q3 F5q3 A5q3 G5h |
+piano.lh    | !p D2e A2e C#3e E3e B1e F#2e A2e D3e | G1e D2e G2e B2e D3e G3e F1e C2e | F1e C2e F2e A2e C3e G3e C3e A2e | F1e C2e F2e A2e C3e G3e C3e A2e |
+harp        | R | !p rq B4e D5e G5e B5e rq | R | R |
+
+section V2_Sho bars=4
+strings     | !mf D5q E5q F#5q A5q | B5q. A5e B5q D6q | A5w~ | A5h rh |
+choir       | !mp [A3 D4 F#4]w:ah | [B3 D4 G4]w | [A3 C#4 E4]h [A3 D4 F#4]h | [G3 B3 D4]h [G3 D4 E4]h |
+cello       | !mp F#3h. A3q | B3h. G3q | C#4q. B3e A3q F#3q | G3h E3q A3q |
+cbass       | !mp D2h B1h | G1h E1h | F#1h B1h | E1h A1h |
+piano.lh    | !p D2e A2e D3e F#3e B1e F#2e B2e D3e | G1e D2e G2e B2e E2e B2e E3e G3e | F#1e C#2e F#2e A2e B1e F#2e A2e D3e | E2e B2e D3e G3e A1e E2e G2e D3e |
+harp        | R | R | !p A4e C#5e E5e A5e B4e D5e F#5e A5e | rh G4e B4e D5e E5e |
+
+section V2_Ten bars=4
+// violas and the town an octave under the violins at the summit
+strings     | !mf D6h B5q D6q | E6h. D6q | B5q. A5e F#5q A5q | B5w |
+strings.s2  | !mp D5h B4q D5q | E5h. D5q | B4q. A4e F#4q A4q | B4w |
+choir.mel   | !mp D5h:ah B4q D5q | E5h. D5q | B4q. A4e F#4q A4q | B4w |
+choir       | !p [B3 D4 F#4]w:ah | [A3 C#4 E4]h. [G3 D4 E4]q | [A3 C#4 E4]w | [B3 D4 F#4]h [A3 D4 F#4]h |
+cello       | !mp D4h B3h | A3q B3q C#4q D4q | C#4w | D4q B3q A3q F#3q |
+cbass       | !mp G1w | A1w | F#1w | B1h A1h |
+piano.lh    | !p G1e D2e B2e F#3e A3e F#3e D3e B2e | A1e E2e A2e C#3e E3e C#3e D3e E3e | F#1e C#2e F#2e A2e C#3e E3e C#3e A2e | B1e F#2e B2e D3e A1e F#2e A2e D3e |
+harp        | R | !p rq A4e C#5e E5e A5e rq | R | rq B4e D5e F#5e B5e rq |
+horns       | R | R | !pp [A3 C#4 E4]w | [B3 D4 F#4]h [A3 D4 F#4]h |
+
+section V2_Ketsu bars=4
+// the glass comes back for the figure; Fadd9 again; the swell into the climax
+strings     | !mf D5q E5q F#5q A5q | B5h. E5q~ | E5w | R |
+beads       | !mf D6q E6q F#6q A6q | B6h. E6q~ | E6w | R |
+glass       | !mp D5q E5q F#5q A5q | B5h. E5q~ | E5w | R |
+choir.hi    | !mp D5q:ah E5q F#5q A5q | B5h. E5q~ | E5w | R |
+choir       | !mp [B3 D4 F#4]w:ah | [A3 D4 F#4]h. [A3 C4 F4]q | [A3 C4 G4]w | [A3 C4 G4]w |
+cello       | !mp B3h A3h | F#3h. A2q | !mf C4q3 F4q3 A4q3 G4h | !mp A4h3 G4q3 F4h3 C4q3 |
+cbass       | !mp G1w | F#1h. F1q~ | F1w~ | F1w |
+accordion   | R | !p rh. [F3 A3 C4 G4]q~ | [F3 A3 C4 G4]w~ | !mp [F3 A3 C4 G4]w |
+flute       | R | R | R | !mf C5q3 F5q3 A5q3 G5h |
+horns       | !pp [B3 D4 F#4]w | [A3 D4 F#4]h. [A3 C4 F4]q | [A3 C4 G4]w | !p [A3 C4 F4]w |
+piano.lh    | !p G1e D2e B2e F#3e A3e F#3e D3e B2e | F#1e D2e A2e D3e F#3e D3e F1e C2e | F1e C2e F2e A2e C3e G3e C3e A2e | F1e C2e F2e A2e C3e G3e C3e A2e |
+timp        | R | R | R | rh !pp F2t3*12 !mp F2t3*12 |
+harp        | R | R | R | rh rq !mp F3t A3t C4t G4t A4t C5t G5t A5t |
+strings.s2  | R | R | R | !p [F4 A4 C5]h !mf [F4 A4 C5]h |
+
+// ---- Climax: full orchestra with chimes -------------------------------------
+section C_Ki bars=4
+// the E falls onto C (bVII) this time; horns and violas answer in the gap
+strings     | !f D5q E5q F#5q A5q | B5h. E5q~ | E5w | R |
+strings.s2  | !f D4q E4q F#4q A4q | B4h. E4q~ | E4w | R |
+strings.s3  | R | R | R | !f A4q B4q C#5h |
+beads       | !f D6q E6q F#6q A6q | B6h. E6q~ | E6w | R |
+choir.hi    | !f D5q:ah E5q F#5q A5q | B5h. E5q~ | E5w | R |
+choir.mel   | !f D4q:ah E4q F#4q A4q | B4h. E4q~ | E4w | R |
+choir       | !mf [A3 D4 F#4]q:ah [A3 C#4 E4]q [B3 D4 F#4]q [A3 D4 F#4]q | [B3 D4 G4]h. [G3 C4 E4]q | [G3 C4 E4]w | [G3 D4 E4]h [G3 C#4 E4]h |
+horns       | !f [F#3 A3 D4]q [E3 A3 C#4]q [F#3 B3 D4]q [F#3 A3 D4]q | [G3 B3 D4]h. [G3 C4 E4]q | [G3 C4 E4]w | A3q B3q C#4h |
+cello       | !f D3q C#3q B2q A2q | G2h. C3q~ | C3w | A2w |
+cbass       | !f D2q C#2q B1q A1q | G1h. C2q~ | C2w | A1w |
+piano.lh    | !mf D2s A2s D3s F#3s C#2s A2s C#3s E3s B1s F#2s B2s D3s A1s F#2s A2s D3s | G1s D2s G2s B2s D3s G3s D3s B2s G1s D2s G2s B2s C2s G2s C3s E3s | (C2s G2s C3s E3s G3s C4s G3s E3s)*2 | A1s E2s A2s D3s E3s G3s E3s D3s A1s E2s A2s C#3s E3s G3s E3s C#3s |
+harp        | !mf D2e A2e C#3e E3e B2e F#3e A3e D4e | G2e D3e G3e B3e D4e G4e C3e G3e | C2e G2e C3e E3e G3e D4e E4e G4e | A2e E3e A3e D4e A2e E3e G3e C#4e |
+bells       | !mf A4w | R | R | R |
+timp        | !f D2q> rq rh | R | R | !mp A2t3*24 !mf A2t3*24 |
+
+section C_Sho bars=4
+strings     | !f D5q E5q F#5q A5q | B5q. A5e B5q D6q | A5w~ | A5h rh |
+strings.s2  | !f D4q E4q F#4q A4q | B4q. A4e B4q D5q | A4w~ | A4h rh |
+choir.mel   | !f D4q:ah E4q F#4q A4q | B4q. A4e B4q D5q | A4w~ | A4h rh |
+choir.hi    | !mf F#5w:ah | G5w | E5h F#5h | G5h E5h |
+choir       | !mf [A3 D4 F#4]w:ah | [B3 D4 G4]w | [A3 C#4 E4]h [A3 D4 F#4]h | [G3 B3 D4]h [G3 D4 E4]h |
+horns       | !mf [F#3 A3 D4]w | [G3 B3 D4]w | !f C#4h D4q F#4q | G4h. A4q |
+cello       | !f F#3h. A3q | B3h. G3q | C#4q. B3e A3q F#3q | G3h E3q A3q |
+cbass       | !f D2h B1h | G1h E1h | F#1h B1h | E1h A1h |
+piano.lh    | !mf (D2s A2s D3s F#3s)*2 (B1s F#2s B2s D3s)*2 | (G1s D2s G2s B2s)*2 (E2s B2s E3s G3s)*2 | (F#1s C#2s F#2s A2s)*2 (B1s F#2s B2s D3s)*2 | (E2s B2s E3s G3s)*2 (A1s E2s A2s D3s)*2 |
+harp        | !mf D3e A3e D4e F#4e B2e F#3e B3e D4e | G2e D3e G3e B3e E3e B3e E4e G4e | A4e C#5e E5e A5e B4e D5e F#5e A5e | G4e B4e D5e E5e A4e D5e E5e G5e |
+bells       | !mf [D4 A4]w | R | R | R |
+timp        | !f D2q> rq rh | R | R | !mp A2t3*12 !mf A2t3*12 !f A2t3*24 |
+
+section C_Ten bars=4
+// the summit: E6 over A with bells, timpani and harp sweeps
+strings     | !ff D6h B5q D6q | E6h. D6q | !f B5q. A5e F#5q A5q | B5w |
+strings.s2  | !ff D5h B4q D5q | E5h. D5q | !f B4q. A4e F#4q A4q | B4w |
+beads       | !f D7h B6q D7q | E7h. D7q | B6q. A6e F#6q A6q | B6w |
+choir.mel   | !ff D5h:ah B4q D5q | E5h. D5q | !f B4q. A4e F#4q A4q | B4w |
+choir.hi    | !ff B5h:ah G5q B5q | A5h. A5q | !f F#5q. F#5e C#5q F#5q | F#5w |
+choir       | !f [B3 D4 G4]w:ah | [A3 C#4 E4]h. [A3 D4 E4]q | [A3 C#4 E4]w | [B3 D4 F#4]h [A3 D4 F#4]h |
+horns       | !f [G3 B3 D4]w | [A3 C#4 E4]h. [A3 D4 E4]q | [A3 C#4 E4]w | [B3 D4 F#4]h [A3 D4 F#4]h |
+cello       | !f G3h B3h | A3q B3q C#4q D4q | C#4w | D4q B3q A3q F#3q |
+cbass       | !ff G1w | A1w | !f F#1w | B1h A1h |
+piano       | !f [D5 D6]h [B4 B5]q [D5 D6]q | [E5 E6]h. [D5 D6]q | [B4 B5]q. [A4 A5]e [F#4 F#5]q [A4 A5]q | [B4 B5]w |
+piano.lh    | !mf (G1s D2s G2s B2s D3s G3s D3s B2s)*2 | A1s E2s A2s C#3s E3s A3s E3s C#3s A1s E2s A2s C#3s A1s E2s A2s D3s | (F#1s C#2s F#2s A2s C#3s E3s C#3s A2s)*2 | B1s F#2s B2s D3s F#3s D3s B2s F#2s A1s F#2s A2s D3s F#3s D3s A2s F#2s |
+harp        | !f G2t B2t D3t G3t B3t D4t G4t B4t D5t G5t B5t D6t G6t B6t D7t G7t rh | A1t C#2t E2t A2t C#3t E3t A3t C#4t E4t A4t C#5t E5t A5t C#6t E6t A6t rh | !mf F#2e C#3e F#3e A3e C#4e E4e A4e C#5e | B2e F#3e B3e D4e A2e F#3e A3e D4e |
+bells       | !f [G4 D5]w | !ff [A4 E5]w | R | R |
+timp        | !f G2q> rq rh | !f A2t3*12 !ff A2t3*24 rq | R | rh !mp A2t3*12 !mf A2t3*12 |
+
+section C_Ketsu bars=2
+// the last statement, broadening; the E is about to be held
+tempo       | >62 | >58 |
+strings     | !ff D5q E5q F#5q A5q | B5h. E5q~ |
+strings.s2  | !ff D6q E6q F#6q A6q | B6h. E6q~ |
+beads       | !f D6q E6q F#6q A6q | B6h. E6q~ |
+glass       | !mf D5q E5q F#5q A5q | B5h. E5q~ |
+choir.hi    | !ff D5q:ah E5q F#5q A5q | B5h. E5q~ |
+choir.mel   | !f D4q:ah E4q F#4q A4q | B4h. rq |
+choir       | !f [G3 B3 D4]w:ah | [A3 D4 F#4]h. [F3 A3 C4 G4]q~ |
+horns       | !f [G3 B3 D4]w | [F#3 A3 D4]h. rq |
+cello       | !f B3h A3h | F#3h. A3q |
+cbass       | !ff G1w | F#1h. F1q~ |
+accordion   | R | rh. !mf [F3 A3 C4 G4]q~ |
+piano       | !f [D5 D6]q [E5 E6]q [F#5 F#6]q [A5 A6]q | [B5 B6]h. [E5 E6]q~ |
+piano.lh    | !mf (G1s D2s G2s B2s D3s G3s D3s B2s)*2 | F#1s D2s F#2s A2s D3s F#3s D3s A2s F#1s D2s F#2s A2s F1s C2s F2s A2s |
+harp        | !f G1t B1t D2t G2t B2t D3t G3t B3t D4t G4t B4t D5t G5t B5t D6t G6t rh | !mf F#2e D3e F#3e A3e D4e F#4e F2e C3e |
+bells       | !f [B4 D5]w | R |
+timp        | !f G2q> rq rh | rh. !mf F2t3*12 |
+
+// ---- Coda: the hold, and home -----------------------------------------------
+section Coda bars=6 tempo=58
+// E held over Fadd9 (Hinata's head on horns and cellos), then G, then Gm6.
+// The orchestra lets go; the glass alone steps down to D; the wind chime
+tempo       | . | >56 | >52 | 50 | >48 | 66 |
+strings     | E5w | !mf E5w | !p E5h rh | !pp [D4 F#4 A4]w~ | [D4 F#4 A4]h rh | R |
+strings.s2  | E6w | !mf E6w | !p E6h rh | R | R | R |
+beads       | E6w | R | R | !p D5w | R | R |
+glass       | E5w~ | E5w~ | E5w | !p D5w~ | D5h rh | R |
+halo        | !p E5w~ | E5w~ | E5w | !p D5w~ | D5h rh | R |
+choir.hi    | E5w | !mf E5w:ah | !p E5h rh | R | R | R |
+choir       | [F3 A3 C4 G4]w | !mp [G3 B3 D4]w:ah | !p [G3 Bb3 D4]w | !pp [F#3 A3 D4]w~ | [F#3 A3 D4]h rh | R |
+horns       | !f C4q3 F4q3 A4q3 G4h | !mf [B3 D4 G4]w | !p [Bb3 D4]h rh | R | R | R |
+cello       | !f C4q3 F4q3 A4q3 G4h | !mf A4h3 G4q3 F4h3 E4q3~ | E4w | !p D4w~ | D4h rh | R |
+cbass       | F1w | !mf G1w | !p G1w | !pp D2w~ | D2h rh | R |
+accordion   | [F3 A3 C4 G4]w | !p [F3 B3 D4 G4]w | !pp [E3 Bb3 D4 G4]h rh | R | R | R |
+piano       | [E5 E6]w | R | R | R | R | R |
+piano.lh    | !mf (F1s C2s F2s A2s C3s G3s C3s A2s)*2 | !mp G1e D2e G2e B2e D3e A3e D3e B2e | R | R | R | R |
+harp        | !mf F2e C3e F3e A3e C4e G4e C4e A3e | !mp G2e D3e G3e B3e D4e A4e D4e B3e | R | !p D2s A2s D3s F#3s A3s D4s F#4s A4s rh | R | R |
+bells       | !f [F4 C5]w | R | R | R | R | R |
+timp        | !mf F2t3*24 !mp F2t3*24 | R | R | !pp D2q rq rh | R | R |
+chime       | R | R | R | R | rh rq !mp D6e3 !p C#6q3~ | C#6w |
+
+form: Prelude V1_Ki V1_Sho V1_Ten V1_Ketsu Bridge V2_Ki V2_Sho V2_Ten V2_Ketsu C_Ki C_Sho C_Ten C_Ketsu Coda

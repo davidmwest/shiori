@@ -1,0 +1,206 @@
+LMN 1
+title: Tamamori the Magnificent
+artist: Shiori examples
+tempo: 132
+time: 3/4
+key: G major; the music-box variation in E minor
+mood: pompous, delighted with itself; then a lone music box, the real girl under the act
+
+// ---------------------------------------------------------------------------
+// TAMAMORI THE MAGNIFICENT (Suzu's theme)
+//
+// A mock-baroque waltz for a chamber band that thinks it is an orchestra:
+// harpsichord, pizzicato strings, glockenspiel, a cheeky bassoon and a pair
+// of timpani. In the middle the act drops and the same tune plays alone on
+// a music box, slowly, in E minor. Then "Oh ho ho!" and the act is back on.
+//
+// THE TUNE (16 bars). It opens with Suzu's figure at its own pitches. In 3/4
+// the figure's long notes land on beat 2 and lean over the bar lines, so it
+// sounds slightly too grand for its own waltz:
+//
+//   D5q E5q F#5q | A5q B5h~ | B5q E5h~ | E5h. |            the figure
+//   D6q. C6e B5q | C6q. B5e A5q | B5q. A5e G5q | A5q B5e A5e G5e F#5e |
+//                         a dotted, strutting fall over a falling bass
+//   D5q E5q F#5q | A5q B5h~ | B5q E5h~ | E5h. |            the figure again
+//   C6h B5q~ | B5q A5h | G5h. | (OH ho ho!)         a hemiola cadence
+//
+// The long E is never followed by D (that is saved for suzu_song): after it
+// the tune always leaps up to D6, or goes to the cadence, or stops.
+//
+// THE LAUGH. The waltz rhythm is ONE-two-three, which is OH-ho-ho. The
+// glockenspiel (with pizzicato and timpani) laughs a falling G triad,
+// D7 B6 G6, accented then staccato. It ends every grand section, giggles at
+// the bassoon in A2, deflates into a ritardando before the music box, and
+// opens the return.
+//
+// FORM  3/4. 4+16+16 bars at 132, 16 bars at 88 with rubato, 4+15 at 132,
+//       and a 3/8 tag: about 1:52
+//   Intro   4  harpsichord flourish (bass, a 32nd-note run, a chord), the
+//              laugh, then oom-pah-pah with the bassoon scrambling up
+//   A1     16  harpsichord melody, glockenspiel doubles the figure an octave
+//              up; harpsichord bass + pizzicato "pah-pah"; the bassoon only
+//              pops in (a scramble, an "ahem") while the tune holds its E
+//   A2     16  the bassoon steals the tune an octave down while the
+//              harpsichord runs in broken-chord eighths and the glockenspiel
+//              giggles; then the harpsichord takes it back with a turn on the
+//              B, and the bassoon blows a raspberry (a glide) under the long
+//              E. The last laugh slows down and goes quiet...
+//   B      16  ...and the music box plays the same tune alone, at 88, in E
+//              minor: the E lands on Cmaj7 (its third), never on E minor; the
+//              cadence lands on G over Em. At the end the box runs down in
+//              the middle of the figure, D E F#, and stops before the A.
+//   Intro   4  "Oh ho ho!" The flourish and the laugh again, as if nothing
+//              happened
+//   A3     15  everyone: glockenspiel an octave above the whole tune,
+//              bassoon an octave below, timpani, a cadential trill
+//   Tag     1  3/8: one last chord. The loop restarts the Intro 1.5 beats
+//              later (the player's 0.7 s gap), so the waltz pulse carries on
+//              straight over the seam.
+//
+// HARMONY (A: the bass falls in thirds, then down the scale)
+//   G | Em | Cmaj7 | Am7 D7 | G | D7/F# | Em | D7 |
+//   G | Em | Cmaj7 | A7 | (hemiola) Am7/C . G/D . D7 . | G | (laugh)
+// HARMONY (B, E minor, the same melody)
+//   Em(add9) | Am(add9) | Cmaj7 | B7sus4 | G | Am7 | Em | B7 |
+//   Em(add9) | Am(add9) | Cmaj7 | Cmaj7 | (hemiola) C . Em . B7 . | Em | (runs down)
+//
+// Registers: harpsichord bass F#1-D3, pizzicato chords B3-C5, melody D5-E6,
+// glockenspiel D6-E7, bassoon E2-E5, timpani D2/G2, music box C4-E6.
+// ---------------------------------------------------------------------------
+
+track hpsi    harpsichord   vol=62 pan=-14 reverb=30
+track pizz    pizzicato     vol=48 pan=20  reverb=30
+track glock   glockenspiel  vol=60 pan=30  reverb=45
+track bsn     bassoon       vol=62 pan=6   reverb=30
+track timp    timpani       vol=56 pan=-24 reverb=45
+track mbox    music_box     vol=84 pan=0   reverb=62
+
+section Intro bars=4
+// BOOM, ta-ra-ra-ra-ra-ra-ra-ra, TA! | OH ho ho! | oom-pah-pah | oom-pah-pah
+hpsi        | !f [G1 G2]q> G3t A3t B3t C4t D4t E4t F#4t G4t [B4 D5 G5]q> | [B5 D6]q> [G5 B5]q' [D5 G5]q' | R | R |
+hpsi.lh     | R | R | !mf [G1 G2]q rh | [D2 D3]q rh |
+glock       | R | !f D7q> B6q' G6q' | R | R |
+pizz        | R | !f [G4 D5]q> [D4 B4]q' [B3 G4]q' | !mp rq [B3 D4 G4]q [B3 D4 G4]q | rq [C4 F#4 A4]q [C4 F#4 A4]q |
+bsn         | R | R | !mp G2q' rq rq | A2e B2e C3e D3e E3e F#3e |
+timp        | !mf G2q> rh | !f G2q> rh | R | R |
+
+section A1 bars=16
+// bars 1-4: Suzu's figure; the glockenspiel an octave up; the bassoon
+// scrambles up under the long E
+hpsi        | !mf D5q E5q F#5q | A5q B5h~ | B5q E5h~ | E5h. |
+glock       | !mp D6q E6q F#6q | A6q B6h~ | B6q E6h~ | E6h. |
+hpsi.lh     | !mf [G1 G2]q rh | [E2 E3]q rh | [C2 C3]q rh | [A1 A2]h [D2 D3]q |
+pizz        | !mp rq [B3 D4 G4]q [B3 D4]q | rq [B3 E4 G4]q [B3 E4 G4]q | rq [C4 E4 G4]q [C4 E4 G4]q | rq [C4 E4 G4]q [C4 F#4 A4]q |
+bsn         | R | R | R | !mp A2e B2e C3e D3e E3e F#3e |
+timp        | !p G2q rh | R | R | R |
+// bars 5-8: the strut, dotted and falling, over a bass falling G F# E D
+hpsi        | D6q. C6e B5q | C6q. B5e A5q | B5q. A5e G5q | A5q B5e A5e G5e F#5e |
+glock       | R | R | R | R |
+hpsi.lh     | [G1 G2]q rh | [F#1 F#2]q rh | [E2 E3]q rh | [D2 D3]q rh |
+pizz        | rq [B3 D4 G4]q [B3 D4 G4]q | rq [C4 D4 A4]q [C4 D4 A4]q | rq [B3 E4 G4]q [B3 E4 G4]q | rq [D4 A4]q [C4 A4]q |
+bsn         | R | R | R | R |
+timp        | R | R | R | R |
+// bars 9-12: the figure again; the bassoon clears its throat under the E
+hpsi        | D5q E5q F#5q | A5q B5h~ | B5q E5h~ | E5h. |
+glock       | D6q E6q F#6q | A6q B6h~ | B6q E6h~ | E6h. |
+hpsi.lh     | [G1 G2]q rh | [E2 E3]q rh | [C2 C3]q rh | [A1 A2]q rh |
+pizz        | rq [B3 D4 G4]q [B3 D4]q | rq [B3 E4 G4]q [B3 E4 G4]q | rq [C4 E4 G4]q [C4 E4 G4]q | rq [C#4 E4 G4]q [C#4 E4 G4]q |
+bsn         | R | R | R | A2q' C#3q' E3q' |
+timp        | R | R | R | R |
+// bars 13-16: hemiola (three half notes across two bars), cadence, the laugh
+hpsi        | !f C6h B5q~ | B5q A5h | G5h. | R |
+glock       | R | R | R | !f D7q> B6q' G6q' |
+hpsi.lh     | [C2 C3]h [D2 D3]q~ | [D2 D3]q [D2 D3]h | [G1 G2]q rh | [G1 G2]q> rh |
+pizz        | !mf [E4 A4]h [G4 B4]q~ | [G4 B4]q [F#4 C5]h | rq [B3 D4 G4]q [B3 D4 G4]q | !f [G4 D5]q> [D4 B4]q' [B3 G4]q' |
+bsn         | !mf C3h D3q~ | D3q D2h | G2q' rq rq | G2q' rq rq |
+timp        | !mf rq rq D2q | rq D2q> rq | G2q> rh | G2q> rh |
+
+section A2 bars=16
+// bars 1-4: the bassoon takes the tune; the harpsichord runs in eighths;
+// the glockenspiel giggles while the bassoon holds its E
+bsn         | !f D4q E4q F#4q | A4q B4h~ | B4q E4h~ | E4h. |
+hpsi        | !p B4e D5e G5e D5e A5e D5e | B4e E5e G5e E5e G5e E5e | C5e E5e G5e E5e B5e E5e | C5e E5e A5e E5e C5e F#5e |
+hpsi.lh     | !mf [G1 G2]q rh | [E2 E3]q rh | [C2 C3]q rh | [A1 A2]h [D2 D3]q |
+glock       | R | R | R | !mp E7q> C7q' A6q' |
+pizz        | R | R | R | R |
+timp        | R | R | R | R |
+// bars 5-8: the bassoon struts, very seriously
+bsn         | D5q. C5e B4q | C5q. B4e A4q | B4q. A4e G4q | A4q B4e A4e G4e F#4e |
+hpsi        | B4e D5e G5e D5e B5e D5e | A4e C5e D5e A4e F#5e D5e | G4e B4e E5e B4e G5e B4e | A4e C5e F#5e C5e D5e C5e |
+hpsi.lh     | [G1 G2]q rh | [F#1 F#2]q rh | [E2 E3]q rh | [D2 D3]q rh |
+glock       | R | R | R | R |
+pizz        | R | R | R | R |
+timp        | R | R | R | R |
+// bars 9-12: the harpsichord takes the tune back, with a turn on the B;
+// the bassoon walks underneath and blows a raspberry under the long E
+hpsi        | !mf D5q E5q F#5q | A5q B5s C6s B5s A5s B5q~ | B5q E5h~ | E5h. |
+bsn         | !mp G2q B2q D3q | E3q D3q B2q | C3q G2q E2q | rq !mf E3q^ E2q' |
+hpsi.lh     | [G1 G2]q rh | [E2 E3]q rh | [C2 C3]q rh | [A1 A2]q rh |
+pizz        | !mp rq [B3 D4 G4]q [B3 D4]q | rq [B3 E4 G4]q [B3 E4 G4]q | rq [C4 E4 G4]q [C4 E4 G4]q | rq [C#4 E4 G4]q [C#4 E4 G4]q |
+glock       | R | R | R | R |
+timp        | R | R | R | R |
+// bars 13-16: hemiola and cadence; then the laugh slows down and goes quiet
+tempo       | . | . | . | . | . | . | . | . | . | . | . | . | . | . | . | >92 |
+hpsi        | !f C6h B5q~ | B5q A5h | G5h. | R |
+bsn         | !mf C3h D3q~ | D3q D2h | G2q' rq rq | R |
+hpsi.lh     | [C2 C3]h [D2 D3]q~ | [D2 D3]q [D2 D3]h | [G1 G2]q rh | R |
+pizz        | !mf [E4 A4]h [G4 B4]q~ | [G4 B4]q [F#4 C5]h | rq [B3 D4 G4]q [B3 D4 G4]q | R |
+glock       | R | R | R | !mp D7q> !p B6q' !pp G6q' |
+timp        | rq rq D2q | rq D2q> rq | G2q> rh | R |
+
+section B bars=16 tempo=88
+// the music box, alone: the same tune, slower, in E minor. Its own comb
+// plays the accompaniment (no bass: a music box doesn't have one)
+tempo       | . | . | . | >84 | 88 | . | . | >82 | 88 | . | . | >84 | 86 | >80 | >72 | >50 |
+mbox        | !mf D5q E5q F#5q | A5q B5h~ | B5q E5h~ | E5h. |
+mbox.acc    | !p E4q G4q B4q | A4q E4q C5q | C4q G4q B4q | F#4q A4q B4q |
+mbox        | D6q. C6e B5q | C6q. B5e A5q | B5q. A5e G5q | A5q B5e A5e G5e F#5e |
+mbox.acc    | G4q B4q D5q | A4q C5q E5q | E4q G4q B4q | F#4q A4q D#5q |
+mbox        | !mp D5q E5q F#5q | A5q B5h~ | B5q E5h~ | E5h. |
+mbox.acc    | E4q G4q B4q | A4q E4q C5q | C4q G4q B4q | C4q B4q G4q |
+// the hemiola, the cadence on G over E minor, then the box runs down
+// in the middle of the figure and stops before the A
+mbox        | C6h B5q~ | B5q A5h | !p G5h. | !pp D5q E5q F#5q |
+mbox.acc    | C4h E4q~ | E4q D#4h | E4q B4q E5q | R |
+
+section A3 bars=15
+// "Oh ho ho! Don't look at me like that." Everyone, grander than before
+// bars 1-4
+hpsi        | !f D5q E5q F#5q | A5q B5h~ | B5q E5h~ | E5h. |
+glock       | !mf D6q E6q F#6q | A6q B6h~ | B6q E6h~ | E6h. |
+bsn         | !mf D4q E4q F#4q | A4q B4h~ | B4q E4h~ | E4q C3e D3e E3e F#3e |
+hpsi.lh     | !f [G1 G2]q rh | [E2 E3]q rh | [C2 C3]q rh | [A1 A2]h [D2 D3]q |
+pizz        | !mf rq [B3 D4 G4]q [B3 D4]q | rq [B3 E4 G4]q [B3 E4 G4]q | rq [C4 E4 G4]q [C4 E4 G4]q | rq [C4 E4 G4]q [C4 F#4 A4]q |
+timp        | !mf G2q> rh | R | R | rq rq D2q |
+// bars 5-8: the strut, in three octaves
+hpsi        | D6q. C6e B5q | C6q. B5e A5q | B5q. A5e G5q | A5q B5e A5e G5e F#5e |
+glock       | D7q. C7e B6q | C7q. B6e A6q | B6q. A6e G6q | A6q B6e A6e G6e F#6e |
+bsn         | D4q. C4e B3q | C4q. B3e A3q | B3q. A3e G3q | A3q B3e A3e G3e F#3e |
+hpsi.lh     | [G1 G2]q rh | [F#1 F#2]q rh | [E2 E3]q rh | [D2 D3]q rh |
+pizz        | rq [B3 D4 G4]q [B3 D4 G4]q | rq [C4 D4 A4]q [C4 D4 A4]q | rq [B3 E4 G4]q [B3 E4 G4]q | rq [D4 A4]q [C4 A4]q |
+timp        | G2q> rh | R | R | D2q rh |
+// bars 9-12
+hpsi        | D5q E5q F#5q | A5q B5s C6s B5s A5s B5q~ | B5q E5h~ | E5h. |
+glock       | D6q E6q F#6q | A6q B6h~ | B6q E6h~ | E6h. |
+bsn         | D4q E4q F#4q | A4q B4h~ | B4q E4h~ | E4q A2q' C#3q' |
+hpsi.lh     | [G1 G2]q rh | [E2 E3]q rh | [C2 C3]q rh | [A1 A2]q rh |
+pizz        | rq [B3 D4 G4]q [B3 D4]q | rq [B3 E4 G4]q [B3 E4 G4]q | rq [C4 E4 G4]q [C4 E4 G4]q | rq [C#4 E4 G4]q [C#4 E4 G4]q |
+timp        | G2q> rh | R | R | R |
+// bars 13-15: hemiola with a cadential trill, and home
+hpsi        | !ff C6h (B5t C6t)*4 | (B5t C6t)*3 B5s A5h | G5h. |
+glock       | !f C7h B6q~ | B6q A6h | G6h. |
+bsn         | !f C3h D3q~ | D3q D2h | G2q> rq rq |
+hpsi.lh     | [C2 C3]h [D2 D3]q~ | [D2 D3]q [D2 D3]h | [G1 G2]q> rh |
+pizz        | !f [E4 A4]h [G4 B4]q~ | [G4 B4]q [F#4 C5]h | [B3 D4 G4]q> rq rq |
+timp        | !f rq rq D2q | rq D2q> rq | !ff G2q> rh |
+
+section Tag bars=1 time=3/8
+// TA! (the loop's gap is the rest of the bar)
+hpsi        | !f [G4 B4 D5 G5]q> re |
+hpsi.lh     | !f [G1 G2]q> re |
+glock       | !f G6q> re |
+pizz        | !f [G3 D4 B4]q> re |
+bsn         | !f G2q> re |
+timp        | !f G2q> re |
+
+form: Intro A1 A2 B Intro A3 Tag
