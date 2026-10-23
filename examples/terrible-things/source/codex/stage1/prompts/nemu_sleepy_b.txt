@@ -1,0 +1,12 @@
+Generate ONE image with your built-in image_gen tool. Do not run any shell commands and do not create or edit files. When the image is done, reply with only the absolute path of the saved PNG.
+
+Image spec:
+- Use: a character sprite for a commercial-quality anime visual novel. It is layered over painted backgrounds, so the background must be genuinely transparent (alpha), with no floor shadow, no frame, no text and no watermark.
+- Framing: portrait canvas, the full figure from the very top of the hair down to mid-thigh, centred, filling most of the canvas height, nothing cropped at the top or sides.
+- Reference: The attached image has two panels. LEFT, labelled DESIGN: the game's simple placeholder art for this character. Keep her design from it (hair, colours, clothes, accessories, pose) but nothing of its flat drawing style. RIGHT, labelled STYLE: a finished sprite of a different character from the same game. Match its art style, line quality, shading, level of finish and canvas framing exactly, but take nothing else from it.
+- Character: Nemu Kagami, the mayor's daughter, 17, about 162 cm but slouched, thin: a lazy, sardonic schemer who says what everyone is thinking. Very long, messy mint-silver hair down past her waist with one stubborn cowlick sticking straight up; it looks slept on. Heavy-lidded pale green eyes, perpetually half-closed. A dark bottle-green council coat (haori) three sizes too big, with a small round mirror crest; the sleeves hang past her hands. Under it a plain grey school-style dress with a high neckline, buttoned wrong. A paper bag of candied chestnuts sticks out of one sleeve.
+- Pose: Slouched, head tilted a little, hands lost in her sleeves, a ledger clamped under one arm.
+- Expression "sleepy": eyes nearly shut, mouth a flat line.
+- The characters are teenagers (17 and 18). Draw them modestly and non-sexualized: covered, buttoned clothing, no cleavage, no suggestive pose, natural youthful proportions.
+- Style: polished modern visual-novel art, as in a high-budget Japanese visual novel: clean, confident coloured line art (never black outlines), soft cel shading with gentle gradients, bright warm saturated colour, light from the upper left. Glass is perfectly clear with faint threads of coloured light inside it and a rainbow rim; never grey, cracked or gory.
+- Variation: give the drawing a slightly different, equally on-model take on her face and hair.

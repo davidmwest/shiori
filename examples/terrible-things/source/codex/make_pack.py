@@ -167,7 +167,7 @@ def expr_prompt(c, e):
         f'This is an EDIT. The attached image is the edit target: a visual-novel sprite of {ch["name"]} with '
         'a transparent background. Change ONLY her facial expression (eyes, eyelids, brows, mouth, blush and '
         f'tears) to "{e}": {ch["exprs"][e]}.',
-        EDIT_KEEP, MODEST]) + '\n'
+        EDIT_KEEP] + ([MODEST] if c != 'hinata' else [])) + '\n'
 
 def blink_prompt(c, e):
     ch = CHARS[c]
@@ -283,7 +283,6 @@ def build_refs(dst):
         labelled([panel(design, 1024, 1536), panel(style, 1024, 1536)],
                  [f'DESIGN: {CHARS[c]["name"]} (placeholder art)', 'STYLE: match this finish only'],
                  os.path.join(dst, f'ref_{c}.png'))
-    shutil.copy(os.path.join(REFS, 'hinata_v1.png'), os.path.join(dst, 'ref_hinata.png'))
 
 def build_cast_sheet(dst):
     order = ['nagi', 'suzu', 'hinata', 'nemu']
@@ -295,7 +294,7 @@ def build_cast_sheet(dst):
 def stage1(pack):
     build_refs(os.path.join(pack, 'refs'))
     jobs = []
-    for c in ('nagi', 'nemu', 'hinata'):
+    for c in ('nagi', 'nemu'):  # Suzu and Hinata keep their approved Codex test sprites
         for v, note in (('a', ''), ('b', 'Variation: give the drawing a slightly different, equally on-model take on her face and hair.')):
             name = f'{c}_{CHARS[c]["default"]}_{v}'
             write(pack, name, base_prompt(c, note))

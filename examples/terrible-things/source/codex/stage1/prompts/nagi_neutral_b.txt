@@ -1,0 +1,12 @@
+Generate ONE image with your built-in image_gen tool. Do not run any shell commands and do not create or edit files. When the image is done, reply with only the absolute path of the saved PNG.
+
+Image spec:
+- Use: a character sprite for a commercial-quality anime visual novel. It is layered over painted backgrounds, so the background must be genuinely transparent (alpha), with no floor shadow, no frame, no text and no watermark.
+- Framing: portrait canvas, the full figure from the very top of the hair down to mid-thigh, centred, filling most of the canvas height, nothing cropped at the top or sides.
+- Reference: The attached image has two panels. LEFT, labelled DESIGN: the game's simple placeholder art for this character. Keep her design from it (hair, colours, clothes, accessories, pose) but nothing of its flat drawing style. RIGHT, labelled STYLE: a finished sprite of a different character from the same game. Match its art style, line quality, shading, level of finish and canvas framing exactly, but take nothing else from it.
+- Character: Nagi, 17, about 155 cm, slim, with neat posture. The protagonist and narrator: a calm girl with something missing, composed, a little blank, watchful. Straight blue-black bob to the jaw with blunt bangs, deep-sea blue where the light hits it; a single thin plait behind her left ear tied with a red cord. Pale grey-blue eyes, the colour of a still sea. An indigo work jacket (a short samue top) over a white high-collared shirt buttoned to the neck, dark grey work trousers. An old iron key on a red cord hangs around her neck.
+- Pose: Standing straight, body turned three-quarters toward screen right, face toward the viewer; her right hand holds her left elbow across her body (reserved, self-contained). Hands drawn with care.
+- Expression "neutral": calm and faintly blank, mouth closed, eyes open and level.
+- The characters are teenagers (17 and 18). Draw them modestly and non-sexualized: covered, buttoned clothing, no cleavage, no suggestive pose, natural youthful proportions.
+- Style: polished modern visual-novel art, as in a high-budget Japanese visual novel: clean, confident coloured line art (never black outlines), soft cel shading with gentle gradients, bright warm saturated colour, light from the upper left. Glass is perfectly clear with faint threads of coloured light inside it and a rainbow rim; never grey, cracked or gory.
+- Variation: give the drawing a slightly different, equally on-model take on her face and hair.

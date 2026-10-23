@@ -1,0 +1,9 @@
+nagi_neutral_a|refs/ref_nagi.png
+nagi_neutral_b|refs/ref_nagi.png
+nemu_sleepy_a|refs/ref_nemu.png
+nemu_sleepy_b|refs/ref_nemu.png
+bg_hill_path|-
+bg_kiln_house|-
+bg_square|-
+bg_statue_garden|-
+bg_seashore|-

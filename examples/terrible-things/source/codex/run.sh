@@ -68,6 +68,7 @@ done
 echo
 echo "$DONE of $TOTAL images done."
 [ -n "$MISSING" ] && echo "Missing:$MISSING. Run the same command again to retry them."
+[ "${NOZIP:-0}" = 1 ] && exit 0
 
 DEST="$HOME/Desktop/shiori-art-$STAGE"
 rm -f "$DEST-part"*.zip
