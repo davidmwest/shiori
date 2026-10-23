@@ -1065,7 +1065,7 @@ Generated from the engine by `shiori docs`. Every command, with its arguments an
 Declare a character: display name, color, sprites or 3D model, and attribute groups.
 
 ```shiori
-@character <id> [name="Display Name"] [color=#hex] — or an indented block of `key: value` lines
+@character <id> [name="Display Name"] [color=#hex]   (or an indented block of `key: value` lines)
 ```
 
 - Properties: name, color, sprite, layer (repeatable), side, blink, mouth, model, scale, y.
@@ -1334,7 +1334,7 @@ Start a chapter: shows a title card and names save files.
 | `card=` | default `true` | bool | Show the title card. |
 
 ```shiori
-@chapter "Chapter 1 — Salt"
+@chapter "Chapter 1: Salt"
 @chapter "Interlude" subtitle="Rin"
 ```
 
@@ -1619,7 +1619,7 @@ Show a full-screen event CG (unlocks it in the gallery), or `@cg none` to close 
 Move the camera. 2D: zoom and pan the stage. 3D: fly between marks and look at things.
 
 ```shiori
-@camera [zoom=1] [x=0] [y=0] [rotate=0] [from=mark] [look=mark] [fov=50] [time=1] [ease=inout] [wait=false]  — or @camera reset
+@camera [zoom=1] [x=0] [y=0] [rotate=0] [from=mark] [look=mark] [fov=50] [time=1] [ease=inout] [wait=false]   (or @camera reset)
 ```
 
 | Argument | | Type | Meaning |
@@ -2138,7 +2138,7 @@ Every message from `shiori check`, `shiori explore` and the player carries one o
 | R703 | Infinite loop | The story ran a long time without stopping for the player: a loop of jumps with no text or choice. |
 | R704 | Menu with no available options | A menu had no available options and was skipped. |
 | R705 | 3D camera arguments over a 2D background | `from=`, `look=`, `fov=` and `orbit=` only apply in 3D worlds. |
-| R706 | Unlock exploration was capped | `shiori explore` replays the story from every different set of endings seen and `@persistent` values a playthrough can end in, but it stops after 16 playthroughs in a row or 64 such sets. Endings, lines and choices that need more playthroughs are then listed as not reached yet, though players may still reach them. If the game needs more playthroughs in a row, raise that limit with `--passes 32`. A `@persistent` value that changes on every playthrough never runs out: raise a counter with `+=` and compare it only with numbers (`@if runs >= 3`), so explore stops counting at the largest one. |
+| R706 | Unlock exploration was capped | `shiori explore` replays the story from every different set of endings seen and `@persistent` values a playthrough can end in, but it stops after 16 playthroughs in a row or 64 such sets. Endings, lines and choices that need more playthroughs are then listed as not reached yet, though players may still reach them. If the game needs more playthroughs in a row, raise that limit with `--passes <n>` on `shiori explore` or `shiori vndb` (for example `--passes 32`). A `@persistent` value that changes on every playthrough never runs out: raise a counter with `+=` and compare it only with numbers (`@if runs >= 3`), so explore stops counting at the largest one. |
 | V800 | VNDB eligibility problem | Reserved for the VNDB report. `shiori vndb` shows a guideline the game may not meet as a ⚠ item, with what VNDB looks for and what to change. It is advice: VNDB's editors decide. |
 | V801 | VNDB eligibility warning | Reserved for the VNDB report. `shiori vndb` shows things worth checking as ℹ and ☐ items. It is advice: VNDB's editors decide. |
 
