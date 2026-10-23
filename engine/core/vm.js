@@ -18,10 +18,33 @@ import { toRuns, plainText, hasNoWait } from './markup.js';
 import { clone, nextRandom, hash } from './util.js';
 import { newStage } from './modules/stage.js';
 import { newAudio } from './modules/audio.js';
-import { defaultRegistry } from './modules/index.js';
+import { defaultRegistry, BUILTIN_MODULES } from './modules/index.js';
+import { has } from './registry.js';
+
+// Tables keyed by names from the script (variables, characters, scenes,
+// endings, choices) have no prototype, so `@var __proto__` or a character
+// called `valueOf` is just a name. JSON (clone(), saves) gives them
+// Object.prototype back; dict() takes it away again.
+function dict(o) {
+  if (o && typeof o === 'object' && Object.getPrototypeOf(o) === null) return o;
+  const out = Object.create(null);
+  if (o && typeof o === 'object') for (const k of Object.keys(o)) out[k] = o[k];
+  return out;
+}
+const STATE_TABLES = ['vars', 'names', 'charAttrs', 'visits', 'chosen'];
+const PERSISTENT_TABLES = ['vars', 'endings', 'read', 'cgs', 'music', 'scenes', 'chosen'];
+function withDicts(o, keys) {
+  for (const k of keys) o[k] = dict(o[k]);
+  return o;
+}
+// An entry of a program table (decls.*, labels). A program read back from
+// JSON has tables with a prototype, where `constructor` would be found too.
+const lookup = (table, key) => has(table, key) ? table[key] : undefined;
 
 export function newPersistent() {
-  return { vars: {}, endings: {}, read: {}, cgs: {}, music: {}, scenes: {}, chosen: {}, playthroughs: 0 };
+  const p = withDicts({}, PERSISTENT_TABLES);
+  p.playthroughs = 0;
+  return p;
 }
 
 const MAX_STEPS = 20000;
@@ -49,7 +72,7 @@ export class VM {
     // changed `@persistent best = ""` to `= 0`) is reset, as load() does for @var.
     for (const v of Object.values(program.decls.vars)) {
       if (!v.persistent) continue;
-      if (!(v.name in this.persistent.vars) || typeof this.persistent.vars[v.name] !== typeof v.init) this.persistent.vars[v.name] = v.init;
+      if (!has(this.persistent.vars, v.name) || typeof this.persistent.vars[v.name] !== typeof v.init) this.persistent.vars[v.name] = v.init;
     }
     this.strict = !!opts.strict;
     this.defaultSeed = opts.seed;
@@ -69,13 +92,21 @@ export class VM {
     this._places = null;
   }
 
+  // Whatever replaces the state or the persistent data (load, rollback, the
+  // explorer restoring a clone) gets prototype-free tables again.
+  get state() { return this._state; }
+  set state(s) { this._state = s && typeof s === 'object' ? withDicts(s, STATE_TABLES) : s; }
+  get persistent() { return this._persistent; }
+  set persistent(p) { this._persistent = p && typeof p === 'object' ? withDicts(p, PERSISTENT_TABLES) : p; }
+
   newState(seed) {
-    const vars = {};
+    const vars = Object.create(null);
     for (const v of Object.values(this.program.decls.vars)) if (!v.persistent) vars[v.name] = v.init;
     return {
-      pc: 0, calls: [], vars, visits: {}, rng: (seed != null ? seed : (Date.now() ^ 0x5eed)) >>> 0,
+      pc: 0, calls: [], vars, visits: Object.create(null), rng: (seed != null ? seed : (Date.now() ^ 0x5eed)) >>> 0,
       stage: newStage(), audio: newAudio(), text: { mode: 'adv', page: [] },
-      names: {}, charAttrs: {}, chosen: {}, chapter: null, scene: null, voice: null, lastEnding: null, halt: null, haltPc: null, pov: null,
+      names: Object.create(null), charAttrs: Object.create(null), chosen: Object.create(null),
+      chapter: null, scene: null, voice: null, lastEnding: null, halt: null, haltPc: null, pov: null,
     };
   }
 
@@ -95,7 +126,7 @@ export class VM {
     this.backlogSeq = 0;
     this.warnings = [];
     const target = label || this.program.start;
-    const pc = this.program.labels[target];
+    const pc = lookup(this.program.labels, target);
     if (pc == null) throw new Error(`Unknown scene \`${target}\`.`);
     this.state.pc = pc;
     if (opts.vars) for (const [k, v] of Object.entries(opts.vars)) this.setVar(k, v);
@@ -152,7 +183,7 @@ export class VM {
   // variable's type is fixed). No result keeps the variable's value; a result
   // that can't be converted is reported and keeps it too.
   gameResult(h, value) {
-    const d = this.program.decls.vars[h.into];
+    const d = lookup(this.program.decls.vars, h.into);
     if (!d || value == null) return;
     const ins = this.program.code[this.state.haltPc];
     const loc = ins && ins.loc;
@@ -215,7 +246,7 @@ export class VM {
   // Jump straight to a scene (debugging, scene replay).
   jump(label) {
     this.need();
-    const pc = this.program.labels[label];
+    const pc = lookup(this.program.labels, label);
     if (pc == null) throw new Error(`Unknown scene \`${label}\`.`);
     this.dropFuture();
     this.state.pc = pc;
@@ -278,12 +309,12 @@ export class VM {
   }
 
   getVar(name) {
-    const d = this.program.decls.vars[name];
+    const d = lookup(this.program.decls.vars, name);
     if (d && d.persistent) return this.persistent.vars[name];
     return this.state.vars[name];
   }
   setVar(name, value) {
-    const d = this.program.decls.vars[name];
+    const d = lookup(this.program.decls.vars, name);
     if (!d) throw new ExprError('R700', `Unknown variable \`${name}\`.`);
     if (d.persistent) { this.persistent.vars[name] = value; this.persistentChanged(); }
     else this.state.vars[name] = value;
@@ -291,7 +322,7 @@ export class VM {
   eval(ast) { return evaluate(ast, this.env); }
 
   displayName(id) {
-    const c = this.program.decls.characters[id];
+    const c = lookup(this.program.decls.characters, id);
     if (!c) return id;
     return this.state.names[id] != null ? this.state.names[id] : c.name;
   }
@@ -301,7 +332,7 @@ export class VM {
       case 'visited': return this.state.visits[args[0]] || 0;
       case 'ending_seen': return !!this.persistent.endings[args[0]];
       // Only this game's endings: ids from an earlier build don't count.
-      case 'endings_seen': return Object.keys(this.persistent.endings).filter(id => Object.prototype.hasOwnProperty.call(this.program.decls.endings, id)).length;
+      case 'endings_seen': return Object.keys(this.persistent.endings).filter(id => has(this.program.decls.endings, id)).length;
       case 'random': {
         // Either order of bounds means the same range; with no whole number in it, the lower bound rounded up.
         const x = Number(args[0]), y = Number(args[1]);
@@ -407,11 +438,29 @@ export class VM {
       case 'end': return this.endGame(ins);
       case 'cmd': {
         const def = this.registry.get(ins.name);
-        if (def && def.exec) def.exec(ins, this);
+        if (!def || !def.exec) return;
+        try { def.exec(ins, this); }
+        catch (e) {
+          // A bad expression or an unknown variable is reported by run(), as for any line.
+          if (e instanceof ExprError) throw e;
+          this.moduleFailed(def, ins, e);
+        }
         return;
       }
     }
     throw new Error('Unknown instruction ' + ins.op);
+  }
+
+  // A module's exec() threw: report it at the script line and go on with the
+  // next instruction (strict mode halts, as for other runtime errors).
+  moduleFailed(def, ins, e) {
+    const detail = String(e && e.message != null ? e.message : e).trim().replace(/\.+$/, '') || 'no message';
+    const mod = def.module || 'unknown';
+    const builtin = BUILTIN_MODULES.some(m => m.commands.includes(def));
+    const hint = builtin
+      ? 'This is a bug in Shiori, not in the script: report it with this line, and meanwhile write the line another way.'
+      : `Fix \`exec()\` for \`${ins.name}\` in that module (listed under \`modules:\` in the header).`;
+    this.fail('R700', `The \`${mod}\` module failed while running \`@${ins.name}\` (${detail}), so the command was skipped. ${hint}`, ins.loc);
   }
 
   assign(ins) {
@@ -435,7 +484,7 @@ export class VM {
     const who = ins.who;
     let attrs = null, color = null, name = ins.name || null;
     if (who) {
-      const c = decls.characters[who];
+      const c = lookup(decls.characters, who);
       if (ins.attrs) {
         const before = JSON.stringify(st.charAttrs[who] || c.defaults);
         st.charAttrs[who] = { ...c.defaults, ...(st.charAttrs[who] || {}), ...ins.attrs };
@@ -456,14 +505,15 @@ export class VM {
     if (this.trackRead && !read) { this.persistent.read[ins.id] = 1; this.persistentChanged(); }
     const voice = st.voice;
     st.voice = null;
+    const narration = !who && !ins.name;
+    const pov = narration && st.pov ? { who: st.pov, name: this.displayName(st.pov), color: (lookup(decls.characters, st.pov) || {}).color || null } : null;
     this.addBacklog({ who, name, color, text: plain, voice, id: ins.id });
     if (st.text.mode === 'nvl') {
-      st.text.page.push({ who, name, color, runs });
+      // pov: a restored page draws narration with its POV border again.
+      st.text.page.push({ who, name, color, runs, pov });
       if (st.text.page.length > 40) st.text.page.shift();
     }
     if (!st.stage.textbox) { st.stage.textbox = true; this.emit({ type: 'text', op: 'textbox', visible: true }); }
-    const narration = !who && !ins.name;
-    const pov = narration && st.pov ? { who: st.pov, name: this.displayName(st.pov), color: (decls.characters[st.pov] || {}).color || null } : null;
     this.halt({
       type: 'say', hist: true, who, name, color, attrs, runs, plain, id: ins.id, read, voice,
       mode: st.text.mode, nw: hasNoWait(ins.text), narration, pov, loc: ins.loc,
@@ -531,7 +581,8 @@ export class VM {
     if (!ins) return { scene: null, offset: 0, id: null };
     const { keys, scenes } = this.places();
     const scene = scenes[pc];
-    const start = this.program.labels[scene] != null ? this.program.labels[scene] : 0;
+    const label = lookup(this.program.labels, scene);
+    const start = label != null ? label : 0;
     const pos = { scene, offset: pc - start, id: keys[pc] };
     if (pc <= start) return pos;
     const op = kindOf(ins);
@@ -568,17 +619,18 @@ export class VM {
     // The line before it was edited too. Counting from the scene heading is a
     // poor guess for text lines (any inserted line shifts it), but a good one
     // for menus, commands and @call.
-    if (pos.op !== 'say' && pos.k && pos.scene && this.program.labels[pos.scene] != null) return nth(this.program.labels[pos.scene], pos.k, false);
+    const heading = pos.scene ? lookup(this.program.labels, pos.scene) : undefined;
+    if (pos.op !== 'say' && pos.k && heading != null) return nth(heading, pos.k, false);
     return null;
   }
 
   resolvePosition(pos) {
-    const labels = this.program.labels;
-    if (!pos) return labels[this.program.start];
+    const label = (id) => lookup(this.program.labels, id);
+    if (!pos) return label(this.program.start);
     const pc = this.locate(pos);
     if (pc != null) return pc;
-    if (pos.scene && labels[pos.scene] != null) return labels[pos.scene];
-    return labels[this.program.start];
+    if (pos.scene && label(pos.scene) != null) return label(pos.scene);
+    return label(this.program.start);
   }
 
   // The save is the snapshot of the current line, so loading shows it again.
@@ -621,7 +673,7 @@ export class VM {
         const at = this.locate(save.position);
         if (at != null && halt.type === 'ending') {
           // Shown again from the save, so the ending isn't counted twice.
-          const e = decls.endings[halt.id];
+          const e = lookup(decls.endings, halt.id);
           if (e) Object.assign(halt, { title: e.title, kind: e.kind });
           st.pc = at + 1;
           st.haltPc = at;
@@ -635,27 +687,26 @@ export class VM {
         const c = p.call ? this.locate(p.call) : null;
         return c != null && code[c].op === 'call' ? c + 1 : this.resolvePosition(p);
       });
-      const vars = {};
+      const vars = Object.create(null);
       for (const v of Object.values(decls.vars)) {
         if (v.persistent) continue;
-        vars[v.name] = (save.state.vars && v.name in save.state.vars && typeof save.state.vars[v.name] === typeof v.init) ? save.state.vars[v.name] : v.init;
+        vars[v.name] = (has(save.state.vars, v.name) && typeof save.state.vars[v.name] === typeof v.init) ? save.state.vars[v.name] : v.init;
       }
       st.vars = vars;
-      st.stage.actors = (st.stage.actors || []).filter(a => decls.characters[a.id] || decls.assets[a.id]);
+      st.stage.actors = (st.stage.actors || []).filter(a => has(decls.characters, a.id) || has(decls.assets, a.id));
       // Attribute values the character no longer declares go back to the group's default.
-      const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
       const fix = (id, attrs) => {
         const c = decls.characters[id], out = { ...c.defaults };
         for (const [g, v] of Object.entries(attrs || {})) {
-          const group = own(c.groups, g) && c.groups[g].includes(v) ? g : own(c.attrIndex, v) ? c.attrIndex[v] : null;
+          const group = has(c.groups, g) && c.groups[g].includes(v) ? g : has(c.attrIndex, v) ? c.attrIndex[v] : null;
           if (group) out[group] = v;
         }
         return out;
       };
-      const charAttrs = {};
-      for (const [id, attrs] of Object.entries(st.charAttrs || {})) if (decls.characters[id]) charAttrs[id] = fix(id, attrs);
+      const charAttrs = Object.create(null);
+      for (const [id, attrs] of Object.entries(st.charAttrs || {})) if (has(decls.characters, id)) charAttrs[id] = fix(id, attrs);
       st.charAttrs = charAttrs;
-      for (const a of st.stage.actors) if (a.kind === 'character' && decls.characters[a.id]) a.attrs = fix(a.id, a.attrs);
+      for (const a of st.stage.actors) if (a.kind === 'character' && has(decls.characters, a.id)) a.attrs = fix(a.id, a.attrs);
     }
     this.state = st;
     this.history = [];
