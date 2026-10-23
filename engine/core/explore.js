@@ -158,7 +158,8 @@ export function explore(program, opts = {}) {
   const starts = [{ persistent: basePersistent, pass: 1 }];
   // passes: the last playthrough (in a row) that showed something new;
   // deepest: the most playthroughs in a row explored.
-  let passes = 1, deepest = 0, unlocksPartial = false;
+  // hitPasses / hitStates: which of the two limits stopped the replays.
+  let passes = 1, deepest = 0, unlocksPartial = false, hitPasses = false, hitStates = false;
   const coverage = () => Object.keys(report.endings).length + report.linesSeen.size + report.optionsShown.size + report.optionsTaken.size +
     report.scenesSeen.size + report.errors.length + report.assertions.length + report.plainEnds.length +
     Object.values(report.branches).reduce((n, b) => n + (b.t > 0) + (b.f > 0), 0);
@@ -173,15 +174,25 @@ export function explore(program, opts = {}) {
     if (report.truncated) break;
     for (const [k, p] of ends) {
       if (startKeys.has(k)) continue;
-      if (pass >= maxPasses || startKeys.size >= maxUnlockStates) { unlocksPartial = true; continue; }
+      if (pass >= maxPasses) { unlocksPartial = hitPasses = true; continue; }
+      if (startKeys.size >= maxUnlockStates) { unlocksPartial = hitStates = true; continue; }
       startKeys.add(k);
       starts.push({ persistent: p, pass: pass + 1 });
     }
   }
   if (unlocksPartial) {
+    // A long run of new unlock states is usually a @persistent value that
+    // never stops changing, not a game that needs that many playthroughs.
+    const hint = [
+      hitPasses ? `If the game needs more playthroughs in a row, try \`--passes ${maxPasses * 2}\`.` : '',
+      hitStates || maxPasses >= MAX_PASSES ? 'A @persistent value that changes on every playthrough never runs out: raise a counter with `+=` and only compare it with numbers (`@if runs >= 3`), so explore stops counting at the largest one.' : '',
+      hitStates ? 'Check an ending listed as not reached by hand with `shiori play --seen … --set …`.' : '',
+    ].filter(Boolean).join(' ');
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
     pushUnique(report.warnings, {
-      code: null,
-      message: `Stopped replaying after ${deepest} playthroughs in a row and ${startKeys.size} different sets of endings seen and @persistent values, with more still to try. Endings, lines and choices that need more playthroughs show up as not reached.`,
+      code: 'R706',
+      message: `Stopped replaying after ${plural(deepest, 'playthrough')} in a row and ${plural(startKeys.size, 'different set')} of endings seen and @persistent values, with more still to try. Endings, lines and choices that need more playthroughs show up as not reached.`,
+      hint,
     });
   }
 
@@ -488,7 +499,9 @@ export function choiceList(path) {
   return path.filter(p => !p.game && (p.input == null || p.value !== p.default)).map(p => p.input != null ? p.value : p.choice).join(',');
 }
 
-// The `shiori play` arguments that replay a route found by explore.
+// The `shiori play` arguments that replay a route found by explore. Every
+// value is shell-quoted when it needs it (typed answers and @persistent text
+// can hold spaces). '' when the route needs none: plain `shiori play` replays it.
 export function replayArgs(e) {
   const s = e.shortest;
   if (!s) return '';
@@ -497,7 +510,7 @@ export function replayArgs(e) {
   if (choices) parts.push('--choices ' + shq(choices));
   const games = s.path.filter(p => p.game).map(p => `${p.game}=${p.result}`);
   if (games.length) parts.push('--game ' + shq(games.join(',')));
-  if (s.rolls && s.rolls.length) parts.push('--rolls ' + s.rolls.join(','));
+  if (s.rolls && s.rolls.length) parts.push('--rolls ' + shq(s.rolls.join(',')));
   if (s.seen && s.seen.length) parts.push('--seen ' + shq(s.seen.join(',')));
   if (s.persist && Object.keys(s.persist).length) parts.push('--set ' + shq(Object.entries(s.persist).map(([k, v]) => k + '=' + v).join(',')));
   return parts.join(' ');

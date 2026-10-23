@@ -14,7 +14,7 @@ import { exprToString } from '../engine/core/expr.js';
 import { vndbReport, formatVndb } from '../engine/core/vndb.js';
 import { commandReference, commandDoc, tablesReference, codesReference } from '../engine/core/docs.js';
 import { checkAssets } from '../engine/core/assets.js';
-import { didYouMean, countWords } from '../engine/core/util.js';
+import { didYouMean, wordWeight } from '../engine/core/util.js';
 import { plainText } from '../engine/core/markup.js';
 
 const HELP = `shiori — tools for Shiori visual novels
@@ -35,11 +35,15 @@ Commands
                --seed <n>           random seed          --state  print the stage after each line
                --quiet              text only            --max <n> stop after n lines
              Repeating a list flag adds to it: --seen a --seen b is --seen a,b.
-  explore    Try every route: every combination of choices, @game results and random() outcomes.
+  explore    Try every route: every combination of choices, @game results, @input answers (the default,
+             the strings your conditions compare it with, and a sample name) and random() outcomes.
+             Games that use ending_seen(), endings_seen() or @persistent are played again from every
+             set of endings and @persistent values a playthrough can end in.
              Lists every ending with the shortest route to it and a checked replay command,
              runtime errors, failed @assert checks, dead ends, conditions that never change, and
              content no route reaches.
                --max-states <n>     exploration budget (default 250000)
+               --passes <n>         most playthroughs in a row for those replays (default 16)
                --seen a,b / --set   start as if these endings / persistent values already existed
   graph      Print the scene graph (--format mermaid | dot | json).
   stats      Word counts, reading time, VNDB length category, lines per character (--by-scene for each scene).
@@ -72,7 +76,7 @@ const COMMON = ['json', 'help'];
 const OPTIONS = {
   check: { bool: ['assets', 'strict'] },
   play: { bool: ['state', 'quiet'], value: ['choices', 'from', 'set', 'seen', 'game', 'rolls', 'seed', 'max', 'game-result'] },
-  explore: { value: ['max-states', 'seen', 'set'] },
+  explore: { value: ['max-states', 'passes', 'seen', 'set'] },
   graph: { value: ['format'] },
   stats: { bool: ['by-scene'] },
   assets: {},
@@ -86,13 +90,14 @@ const ALIASES = { scene: 'from', start: 'from', choice: 'choices', ending: 'seen
 const VALUE_HELP = {
   choices: '--choices 1,2,1', from: '--from <scene>', set: '--set name=value', seen: '--seen <ending>,…', game: '--game <id>=<result>',
   rolls: '--rolls 3,true,…', seed: '--seed <n>', max: '--max <n>', 'max-states': '--max-states <n>', format: '--format mermaid|dot|json',
-  'game-result': '--game-result <result>',
+  'game-result': '--game-result <result>', passes: '--passes <n>',
 };
 const valueHelp = (cmd, k) => cmd === 'docs' && k === 'game' ? '--game <folder>' : VALUE_HELP[k] || `--${k} <value>`;
 const wholeNumber = (v) => /^\d+$/.test(v) && Number(v) > 0 ? null : 'a whole number above 0';
 const VALUE_CHECKS = {
   max: wholeNumber,
   'max-states': wholeNumber,
+  passes: wholeNumber,
   seed: (v) => v.trim() !== '' && Number.isFinite(Number(v)) ? null : 'a number',
   format: (v) => ['mermaid', 'dot', 'json'].includes(v) ? null : 'mermaid, dot or json',
 };
@@ -595,20 +600,23 @@ async function cmdExplore(o) {
   const program = res.program;
   const { persistent, problems } = startData(o, program, { forExplore: true });
   if (problems.length) return fail(problems.join('\n'));
-  const ex = explore(program, { registry: res.registry, maxStates: o['max-states'] ? Number(o['max-states']) : undefined, persistent });
-  const partial = ex.truncated;
+  const ex = explore(program, { registry: res.registry, maxStates: o['max-states'] ? Number(o['max-states']) : undefined, passes: o.passes ? Number(o.passes) : undefined, persistent });
+  // Partial: the state budget or the replay limits stopped the search, so
+  // "not reached" only means "not reached yet".
+  const partial = ex.truncated || ex.unlocksPartial;
   if (ex.errors.length || ex.assertions.length || (!partial && ex.unreachedEndings.length)) host.exit(1);
   if (o.json) { out(JSON.stringify(ex, null, 2)); return; }
   out(`Explored ${ex.routes.toLocaleString('en-US')} route${ex.routes === 1 ? '' : 's'} (${ex.states.toLocaleString('en-US')} states${ex.passes > 1 ? `, ${ex.passes} playthroughs to cover unlocks` : ''}${ex.randomUsed ? ', including random() outcomes' : ''}).`);
-  if (partial) out(`STOPPED EARLY at --max-states ${ex.maxStates} with ${ex.frontier.toLocaleString('en-US')} branches still unexplored, so everything below is partial: "not reached" means "not reached yet". Try --max-states ${ex.maxStates * 8}.`);
+  if (ex.truncated) out(`STOPPED EARLY at --max-states ${ex.maxStates} with ${ex.frontier.toLocaleString('en-US')} branches still unexplored, so everything below is partial: "not reached" means "not reached yet". Try --max-states ${ex.maxStates * 8}.`);
   out('');
   out(`Endings (${ex.endings.length}):`);
   for (const e of ex.endings) {
     out(`  ★ ${e.title}${e.id !== 'END' ? ` [${e.id}]` : ''} — ${e.routes} route${e.routes === 1 ? '' : 's'}${e.pass > 1 ? ` (needs playthrough ${e.pass})` : ''}`);
     if (!e.shortest) continue;
     out(`      shortest: ${formatPath(e.shortest.path)}${e.shortest.rolls && e.shortest.rolls.length ? `  (random: ${e.shortest.rolls.join(',')})` : ''}`);
-    const args = replayArgs(e);
-    if (args) out(`      replay:   shiori play ${res.base === '.' ? '' : shq(res.base) + ' '}${args}${e.shortest.verified === false ? '   (⚠ could not confirm this replay)' : ''}`);
+    // No arguments (a route with no choice, or only default @input answers): plain `shiori play <folder>`.
+    const replay = ['shiori play', res.base === '.' ? '' : shq(res.base), replayArgs(e)].filter(Boolean).join(' ');
+    out(`      replay:   ${replay}${e.shortest.verified === false ? '   (⚠ could not confirm this replay)' : ''}`);
   }
   if (ex.unreachedEndings.length) {
     out('');
@@ -629,7 +637,10 @@ async function cmdExplore(o) {
   if (ex.warnings.length) {
     out('');
     out('Warnings:');
-    for (const p of ex.warnings.slice(0, 20)) out(`  ⚠ ${p.message}${p.loc ? ` (${p.loc.file}:${p.loc.line})` : ''}`);
+    for (const p of ex.warnings.slice(0, 20)) {
+      out(`  ⚠ ${p.code ? p.code + ' ' : ''}${p.message}${p.loc ? ` (${p.loc.file}:${p.loc.line})` : ''}`);
+      if (p.hint) out(`      hint: ${p.hint}`);
+    }
   }
   out('');
   if (ex.constantConditions.length) {
@@ -644,6 +655,7 @@ async function cmdExplore(o) {
   if (ex.lines.unseen.length && ex.lines.unseen.length <= 15) for (const l of ex.lines.unseen) out(`  Line ${unseenWord}: ${l.file}:${l.line}`);
   else if (ex.lines.unseen.length) out(`  ${ex.lines.unseen.length} lines are ${unseenWord} (first: ${ex.lines.unseen.slice(0, 5).map(l => l.file + ':' + l.line).join(', ')}).`);
   for (const c of ex.options.neverShown) out(`  Choice ${partial ? 'not offered yet' : 'never offered'}: "${c.text}" (${c.loc.file}:${c.loc.line})${partial ? '' : ' — its condition is never true.'}`);
+  for (const c of ex.options.neverTaken) out(`  Choice ${partial ? 'not unlocked yet' : 'never unlocked'}: "${c.text}" (${c.loc.file}:${c.loc.line})${partial ? '' : ' — its [require] is false on every route.'}`);
 }
 
 async function cmdGraph(o) {
@@ -687,8 +699,7 @@ async function cmdStats(o) {
     for (const ins of res.program.code) {
       if (ins.op !== 'say') continue;
       const p = per[ins.scene] = per[ins.scene] || { n: 0, d: 0, lines: 0 };
-      const c = countWords(plainText(ins.text));
-      const w = c.words + c.cjk / 2;
+      const w = wordWeight(plainText(ins.text));
       if (ins.who || ins.name) p.d += w; else p.n += w;
       p.lines++;
     }
