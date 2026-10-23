@@ -73,6 +73,16 @@ function exprCommentAt(s) {
   return -1;
 }
 
+// Inside quotes a backslash escapes only \\, \" and \', as in expressions
+// (expr.js). Anything else (\n, \t, a \u code) is E110: dropping the backslash
+// would silently change the text.
+const ARG_ESCAPES = ['\\', '"', "'"];
+function argEscapeHint(e) {
+  if (e === 'n' || e === 'r') return 'A quoted argument cannot hold a line break. For a break in dialogue or narration, put `{br}` in the text line instead.';
+  if (e === 'u' || e === 'x') return 'Type the character itself, e.g. `—` rather than `\\u2014`.';
+  return 'Only `\\"`, `\\\'` and `\\\\` are escapes. Write `\\\\` for a backslash, and `/` between the folders of a path.';
+}
+
 // Split command arguments: words, "quoted strings", key=value, key="quoted".
 // A ` //` outside quotes starts a comment.
 export function tokenizeArgs(s, baseCol, diags, loc) {
@@ -93,7 +103,16 @@ export function tokenizeArgs(s, baseCol, diags, loc) {
       i++;
       let closed = false;
       while (i < s.length) {
-        if (s[i] === '\\' && i + 1 < s.length) { value += s[i + 1]; i += 2; continue; }
+        if (s[i] === '\\' && i + 1 < s.length) {
+          const e = s[i + 1];
+          if (ARG_ESCAPES.includes(e)) value += e;
+          else {
+            diags.error('E110', `Unknown escape \`\\${e}\` in a quoted argument.`, { ...loc, col: baseCol + i + 1 }, argEscapeHint(e));
+            value += '\\' + e;
+          }
+          i += 2;
+          continue;
+        }
         if (s[i] === q) { closed = true; i++; break; }
         value += s[i++];
       }

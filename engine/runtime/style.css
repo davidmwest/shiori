@@ -40,7 +40,7 @@ html, body { margin: 0; height: 100%; background: #05060c; color: var(--sh-text)
 .sh-narration .sh-text { color: #eceaf6; }
 .sh-ch { opacity: 0; transition: opacity 70ms linear; }
 .sh-ch.on { opacity: 1; }
-.sh-text ruby rt, .sh-nvl ruby rt { font-size: 0.5em; opacity: 0.85; }
+.sh-text ruby rt, .sh-nvl ruby rt, .sh-choices ruby rt { font-size: 0.5em; opacity: 0.85; }
 .sh-namebox {
   position: absolute; left: 196px; bottom: 252px; padding: 9px 30px 10px; border-radius: 16px 16px 4px 4px;
   font-size: calc(30px * var(--sh-text-scale)); font-weight: 700; letter-spacing: 0.06em;
