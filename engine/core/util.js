@@ -99,11 +99,34 @@ export function joinPath(base, rel) {
   return out.join('/');
 }
 
-// Count words for reading-time estimates. CJK characters count as
-// ~0.5 word each (a common rule of thumb for mixed text).
+// Count words for reading-time estimates, in any script.
+//   words: space-separated words (Latin, Cyrillic, Greek, Arabic, Hebrew,
+//          Devanagari, Hangul ...), plus an estimate for Thai, Lao, Khmer and
+//          Myanmar, which are written without spaces between words: about
+//          one word per 4 letters (a rough rule of thumb), so it can be
+//          fractional.
+//   cjk:   Han and kana characters, which count as ~0.5 word each (a common
+//          rule of thumb for mixed text).
+// The reading-time weight of a text is `words + cjk / 2` (see wordWeight).
+const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]/gu;
+const NO_SPACE_LETTER = /[\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+const NO_SPACE = /[\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]+/gu;
+const WORD = /[\p{L}\p{N}][\p{L}\p{N}\p{M}'’-]*/gu;
 export function countWords(text) {
-  const cjk = (text.match(/[぀-ヿ㐀-鿿가-힯]/g) || []).length;
-  const rest = text.replace(/[぀-ヿ㐀-鿿가-힯]/g, ' ');
-  const words = (rest.match(/[A-Za-z0-9À-ɏ'’-]+/g) || []).length;
+  const s = String(text == null ? '' : text);
+  const cjk = (s.match(CJK) || []).length;
+  let rest = s.replace(CJK, ' ');
+  let words = 0;
+  if (NO_SPACE_LETTER.test(rest)) {
+    for (const run of rest.match(NO_SPACE) || []) words += (run.match(/\p{L}/gu) || []).length / 4;
+    rest = rest.replace(NO_SPACE, ' ');
+  }
+  words += (rest.match(WORD) || []).length;
   return { words, cjk };
+}
+
+// Reading-time weight of a text, in words.
+export function wordWeight(text) {
+  const c = countWords(text);
+  return c.words + c.cjk / 2;
 }

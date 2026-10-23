@@ -3,7 +3,7 @@
 
 import { plainText } from './markup.js';
 import { collectRefs } from './expr.js';
-import { countWords } from './util.js';
+import { wordWeight } from './util.js';
 
 export const LENGTH_CATEGORIES = [
   { id: 1, name: 'Very short', max: 2, doc: '< 2 hours' },
@@ -30,6 +30,19 @@ export function successors(program, pc) {
     case 'menu': return ins.options.map(o => o.pc === -1 ? ins.next : o.pc).filter(p => p !== 'END' && p != null);
     default: return [pc + 1];
   }
+}
+
+// The scene every instruction belongs to. Compiler-made instructions (the
+// gotos that close option bodies and @if branches) carry no scene of their
+// own, so this follows the code: each scene's code starts with its `scene` op.
+export function sceneOfPc(program) {
+  const out = new Array(program.code.length);
+  let cur = null;
+  program.code.forEach((ins, pc) => {
+    if (ins.op === 'scene') cur = ins.id;
+    out[pc] = ins.scene || cur;
+  });
+  return out;
 }
 
 // Which state can still matter at each instruction? For every pc, the set
@@ -93,70 +106,278 @@ export function reachable(program) {
 }
 
 function wordsOf(ins) {
-  const t = plainText(ins.text);
-  const c = countWords(t);
-  return c.words + c.cjk / 2;
+  return wordWeight(plainText(ins.text));
 }
 
-// Scene-level graph: edges are jumps, calls, choices and fall-through.
+// Where a menu option leads: walks the option body (through @if branches
+// and gotos, staying in the menu's scene) and returns the pcs where it
+// leaves the scene, 'END' for `-> END`, and `join: true` when it reaches
+// the code after the menu, which every option shares. Nested menus are not
+// entered: their own options are walked separately. `visited` lists the
+// option body's instructions.
+function optionExits(program, sceneOf, menuPc, o) {
+  const code = program.code, menu = code[menuPc], from = sceneOf[menuPc];
+  const res = { exits: [], join: false, visited: [] };
+  if (o.pc === 'END') { res.exits.push('END'); return res; }
+  if (o.pc === -1 || o.pc == null) { res.join = true; return res; }
+  // `* Text -> target` has no body: it goes straight to the target, even
+  // when that target is the scene right after the menu.
+  if (o.label) { res.exits.push(o.pc); return res; }
+  const seen = new Set();
+  const stack = [o.pc];
+  while (stack.length && seen.size < 20000) {
+    const p = stack.pop();
+    if (p == null || seen.has(p)) continue;
+    if (p === 'END') { res.exits.push('END'); continue; }
+    seen.add(p);
+    if (p === menu.next) { res.join = true; continue; }
+    const x = code[p];
+    if (!x) continue;
+    if (sceneOf[p] !== from) { res.exits.push(p); continue; }
+    res.visited.push(p);
+    if (x.op === 'jump') { if (x.pc != null) res.exits.push(x.pc); continue; }
+    if (x.op === 'end') { if (!x.implicit) res.exits.push('END'); continue; }
+    if (x.op === 'return' || x.op === 'menu') continue;
+    if (x.op === 'call') { stack.push(p + 1); continue; }
+    for (const s of successors(program, p)) stack.push(s);
+  }
+  return res;
+}
+
+// Where control goes from `pc` until it leaves the scene: the set of scenes
+// (and 'END') it can reach, plus 'menu:<pc>' for a menu on the way (the
+// choices there decide what happens next).
+function exitsFrom(program, sceneOf, pc) {
+  const code = program.code, from = sceneOf[pc];
+  const out = new Set();
+  const seen = new Set();
+  const stack = [pc];
+  while (stack.length && seen.size < 20000) {
+    const p = stack.pop();
+    if (p == null || seen.has(p)) continue;
+    if (p === 'END') { out.add('END'); continue; }
+    seen.add(p);
+    const x = code[p];
+    if (!x) { out.add('END'); continue; }
+    if (sceneOf[p] !== from) { out.add(sceneOf[p]); continue; }
+    if (x.op === 'end') { out.add('END'); continue; }
+    if (x.op === 'menu') { out.add('menu:' + p); continue; }
+    if (x.op === 'jump') { if (x.pc != null) out.add(sceneOf[x.pc] === from ? 'loop:' + from : sceneOf[x.pc]); continue; }
+    if (x.op === 'call') { stack.push(p + 1); continue; }
+    for (const s of successors(program, p)) stack.push(s);
+  }
+  return out;
+}
+
+// Scene-level graph: edges are jumps, calls, choices and fall-through
+// (including a menu that gathers, the goto that closes an option body, or
+// an @if whose other side runs into the next scene).
 export function storyGraph(program) {
+  const code = program.code;
   const nodes = program.sceneOrder.map(id => ({ id, title: program.scenes[id].title, file: program.scenes[id].file, line: program.scenes[id].line, endings: [], words: 0 }));
   const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const sceneOf = sceneOfPc(program);
   const edges = [];
-  const sceneAt = (pc) => { const ins = program.code[pc]; return ins ? ins.scene : null; };
-  program.code.forEach((ins, pc) => {
-    const from = ins.scene;
+  code.forEach((ins, pc) => {
+    const from = sceneOf[pc];
     if (!from || !byId[from]) return;
-    if (ins.op === 'say') byId[from].words += wordsOf(ins);
-    if (ins.op === 'cmd' && ins.name === 'ending') byId[from].endings.push(ins.args.id);
     const add = (to, kind, label) => {
       if (to === 'END') { edges.push({ from, to: 'END', kind, label }); return; }
-      const target = sceneAt(to);
-      if (target && target !== from) edges.push({ from, to: target, kind, label });
+      const target = typeof to === 'number' ? sceneOf[to] : null;
+      if (target && target !== from && byId[target]) edges.push({ from, to: target, kind, label });
     };
-    if (ins.op === 'jump') add(ins.pc, 'jump');
-    if (ins.op === 'call') add(ins.pc, 'call');
-    if (ins.op === 'end' && !ins.implicit) edges.push({ from, to: 'END', kind: 'end' });
-    if (ins.op === 'menu') ins.options.forEach(o => {
-      const label = plainText(o.text);
-      if (o.pc === 'END') edges.push({ from, to: 'END', kind: 'choice', label });
-      else if (o.pc !== -1) {
-        // follow the option body to its first jump
-        let p = o.pc, guard = 0;
-        while (p != null && p < program.code.length && guard++ < 5000) {
-          const x = program.code[p];
-          if (x.scene !== from) { add(p, 'choice', label); break; }
-          if (x.op === 'jump') { add(x.pc, 'choice', label); break; }
-          if (x.op === 'end') { edges.push({ from, to: 'END', kind: 'choice', label }); break; }
-          if (x.op === 'goto' || x.op === 'menu' || x.op === 'branch' || x.op === 'return') break;
-          p++;
-        }
-      }
-    });
-    // fall-through into the next scene
-    const next = program.code[pc + 1];
-    if (next && next.op === 'scene' && next.scene !== from && !['jump', 'goto', 'end', 'return'].includes(ins.op)) add(pc + 1, 'next');
+    if (ins.op === 'say') byId[from].words += wordsOf(ins);
+    if (ins.op === 'cmd' && ins.name === 'ending') byId[from].endings.push(ins.args.id);
+    switch (ins.op) {
+      case 'jump': if (ins.pc != null) add(ins.pc, 'jump'); break;
+      case 'call': if (ins.pc != null) add(ins.pc, 'call'); break;
+      case 'end': if (!ins.implicit) add('END', 'end'); break;
+      case 'return': break;
+      case 'menu':
+        ins.options.forEach(o => {
+          const label = plainText(o.text);
+          for (const to of optionExits(program, sceneOf, pc, o).exits) add(to, 'choice', label);
+        });
+        // A gathering option continues after the menu, which may be the next scene.
+        if (ins.options.some(o => o.pc === -1) && ins.next != null) add(ins.next, 'next');
+        break;
+      default:
+        for (const s of successors(program, pc)) add(s, 'next');
+    }
   });
   const seenEdge = new Set();
   const unique = edges.filter(e => { const k = e.from + '>' + e.to + '>' + (e.label || ''); if (seenEdge.has(k)) return false; seenEdge.add(k); return true; });
   return { nodes, edges: unique };
 }
 
+// Do choices lead to different routes? True when some reachable menu has
+// options that go to different scenes, or when a variable set by a choice
+// is tested by an @if whose two sides go to different scenes (the usual
+// "choice sets a flag, the story branches on it later" pattern).
+function hasBranchingChoices(program, reach, sceneOf) {
+  const code = program.code;
+  const written = new Set();
+  for (let pc = 0; pc < code.length; pc++) {
+    const ins = code[pc];
+    if (ins.op !== 'menu' || !reach[pc]) continue;
+    const dests = new Set();
+    let scenes = 0;
+    for (const o of ins.options) {
+      const r = optionExits(program, sceneOf, pc, o);
+      const to = [...new Set(r.exits.filter(x => x !== 'END').map(x => sceneOf[x]).filter(s => s && s !== sceneOf[pc]))].sort();
+      scenes += to.length;
+      dests.add(to.join(',') + (r.join ? '|join' : '') + (r.exits.includes('END') ? '|end' : ''));
+      for (const p of r.visited) if (code[p].op === 'set') written.add(code[p].name);
+    }
+    if (scenes && dests.size > 1) return true;
+  }
+  if (!written.size) return false;
+  for (let pc = 0; pc < code.length; pc++) {
+    const ins = code[pc];
+    if (ins.op !== 'branch' || !reach[pc] || !ins.cond) continue;
+    if (!collectRefs(ins.cond).vars.some(v => written.has(v.name))) continue;
+    const a = exitsFrom(program, sceneOf, pc + 1), b = exitsFrom(program, sceneOf, ins.else);
+    const scenesOf = (s) => [...s].filter(x => x !== 'END' && !x.startsWith('menu:') && !x.startsWith('loop:')).sort().join(',');
+    const sa = scenesOf(a), sb = scenesOf(b);
+    if ((sa || sb) && sa !== sb) return true;
+  }
+  return false;
+}
+
+// Longest runs of dialogue without narration (W614) and of ADV lines with
+// no visual change (W616), measured along the story's control flow: the
+// bodies of different choices, the two sides of an @if, and scenes that
+// merely sit next to each other in a file are never added together, while a
+// run that really continues through a jump or a fall-through is.
+// Each instruction gets the longest run that can reach it (the maximum over
+// its predecessors). Inside a loop, a run is capped at the lines entering
+// the loop plus every line of the loop once.
+const VISUAL = new Set(['scene', 'bg', 'show', 'hide', 'move', 'cg', 'camera', 'weather', 'filter', 'tint', 'shake', 'flash', 'video', 'mode']);
+function readingRuns(program, reach, sceneOf) {
+  const code = program.code, N = code.length;
+  // A @call runs the called scene, and its @return comes back after a call.
+  const callReturns = [];
+  code.forEach((ins, pc) => { if (ins.op === 'call' && ins.pc != null) callReturns.push(pc + 1); });
+  const succ = code.map((ins, pc) => (ins.op === 'return' ? callReturns : ins.op === 'call' && ins.pc != null ? [ins.pc] : successors(program, pc))
+    .filter(s => typeof s === 'number' && s >= 0 && s < N));
+  const inD =new Int32Array(N).fill(-1), inDs = new Int32Array(N), inS = new Int32Array(N).fill(-1), inSs = new Int32Array(N);
+  const inM = new Uint8Array(N); // modes that can be active: 1 = adv, 2 = nvl
+  const seed = (pc) => { if (pc == null || pc < 0 || pc >= N) return; if (inD[pc] < 0) { inD[pc] = 0; inDs[pc] = pc; } if (inS[pc] < 0) { inS[pc] = 0; inSs[pc] = pc; } inM[pc] |= 1; };
+  seed(program.labels[program.start]);
+  code.forEach((ins, pc) => { if (ins.op === 'scene' && !reach[pc]) seed(pc); });
+
+  const isNarration = (ins) => !ins.who && !ins.name;
+  const resetsStill = (ins, m) => (ins.op === 'say' && ((ins.attrs && Object.keys(ins.attrs).length) || m === 2)) || ins.op === 'menu' || (ins.op === 'cmd' && VISUAL.has(ins.name));
+  // Transfer: the run lengths after `pc` given the ones before it.
+  const transfer = (pc) => {
+    const ins = code[pc];
+    let d = inD[pc], ds = inDs[pc], s = inS[pc], ss = inSs[pc], m = inM[pc];
+    if (ins.op === 'cmd' && ins.name === 'mode') m = ins.args.mode === 'nvl' ? 2 : 1;
+    if (ins.op === 'say') {
+      if (isNarration(ins)) d = 0; else { if (d === 0) ds = pc; d++; }
+    }
+    if (resetsStill(ins, m)) s = 0;
+    else if (ins.op === 'say') { if (s === 0) ss = pc; s++; }
+    return { d, ds, s, ss, m };
+  };
+
+  // Strongly connected components (iterative Tarjan), in topological order.
+  const index = new Int32Array(N).fill(-1), low = new Int32Array(N), onStack = new Uint8Array(N), comp = new Int32Array(N).fill(-1);
+  const sccs = [];
+  const stack = [];
+  let counter = 0;
+  for (let root = 0; root < N; root++) {
+    if (index[root] >= 0) continue;
+    const work = [[root, 0]];
+    index[root] = low[root] = counter++; stack.push(root); onStack[root] = 1;
+    while (work.length) {
+      const top = work[work.length - 1];
+      const v = top[0];
+      if (top[1] < succ[v].length) {
+        const w = succ[v][top[1]++];
+        if (index[w] < 0) { index[w] = low[w] = counter++; stack.push(w); onStack[w] = 1; work.push([w, 0]); }
+        else if (onStack[w]) low[v] = Math.min(low[v], index[w]);
+        continue;
+      }
+      work.pop();
+      if (work.length) { const u = work[work.length - 1][0]; low[u] = Math.min(low[u], low[v]); }
+      if (low[v] === index[v]) {
+        const c = [];
+        let w;
+        do { w = stack.pop(); onStack[w] = 0; comp[w] = sccs.length; c.push(w); } while (w !== v);
+        sccs.push(c);
+      }
+    }
+  }
+  sccs.reverse();
+  const nComp = comp.map(c => sccs.length - 1 - c);
+
+  const join = (t, out, cap) => {
+    let changed = false;
+    const d = Math.min(out.d, cap.d), s = Math.min(out.s, cap.s);
+    if (d > inD[t]) { inD[t] = d; inDs[t] = out.ds; changed = true; }
+    if (s > inS[t]) { inS[t] = s; inSs[t] = out.ss; changed = true; }
+    if ((inM[t] | out.m) !== inM[t]) { inM[t] |= out.m; changed = true; }
+    return changed;
+  };
+  const NO_CAP = { d: Infinity, s: Infinity };
+  sccs.forEach((c, ci) => {
+    const members = c.filter(pc => inD[pc] >= 0);
+    if (!members.length) return;
+    const loop = c.length > 1 || succ[c[0]].includes(c[0]);
+    let cap = NO_CAP;
+    if (loop) {
+      // Every line of the loop at most once: dialogue lines for W614, and
+      // lines that do not themselves change the picture for W616.
+      const talk = c.filter(pc => code[pc].op === 'say' && !isNarration(code[pc])).length;
+      const plain = c.filter(pc => code[pc].op === 'say' && !(code[pc].attrs && Object.keys(code[pc].attrs).length)).length;
+      cap = { d: members.reduce((m, pc) => Math.max(m, inD[pc]), 0) + talk, s: members.reduce((m, pc) => Math.max(m, inS[pc]), 0) + plain };
+    }
+    const work = members.slice();
+    const queued = new Set(work);
+    let guard = 0;
+    while (work.length && guard++ < 1e6) {
+      const pc = work.pop();
+      queued.delete(pc);
+      const out = transfer(pc);
+      for (const t of succ[pc]) {
+        const inside = nComp[t] === ci;
+        if (join(t, out, inside ? cap : NO_CAP) && inside && !queued.has(t)) { queued.add(t); work.push(t); }
+      }
+    }
+  });
+
+  // Read the runs off the converged values.
+  const dialogue = new Map(), still = new Map();
+  let longest = { length: 0, pc: null };
+  const note = (map, len, startPc) => { if (len >= 30 && (!map.has(startPc) || map.get(startPc) < len)) map.set(startPc, len); };
+  for (let pc = 0; pc < N; pc++) {
+    if (inD[pc] < 0) continue;
+    const ins = code[pc];
+    const out = transfer(pc);
+    if (ins.op === 'say' && isNarration(ins)) note(dialogue, inD[pc], inDs[pc]);
+    if (ins.op === 'say' && !isNarration(ins) && out.d > longest.length) longest = { length: out.d, pc: out.ds };
+    if (resetsStill(ins, out.m)) note(still, inS[pc], inSs[pc]);
+    if (!succ[pc].length) { note(dialogue, out.d, out.ds); note(still, out.s, out.ss); }
+  }
+  const list = (map) => [...map.entries()].sort((a, b) => a[0] - b[0]).map(([pc, length]) => ({ length, scene: sceneOf[pc], loc: code[pc].loc }));
+  return {
+    dialogueRuns: list(dialogue),
+    staticRuns: list(still),
+    maxDialogueRun: longest.pc == null ? { length: 0, scene: null, loc: null } : { length: longest.length, scene: sceneOf[longest.pc], loc: code[longest.pc].loc },
+  };
+}
+
 export function analyze(program) {
   const reach = reachable(program);
+  const sceneOf = sceneOfPc(program);
   const header = program.header;
   const wpm = header.reading_speed || 200;
   const perChar = {};
   let words = 0, narrationWords = 0, dialogueWords = 0, lines = 0, narrationLines = 0, reachableWords = 0;
   let menus = 0, options = 0, inputs = 0, games = [], gameMinutes = 0, videos = [], voiced = 0, dialogueLines = 0;
   let nvlLines = 0, advLines = 0, mode = 'adv';
-  let maxDialogueRun = { length: 0, scene: null, line: null }, run = 0, runStart = null;
-  const dialogueRuns = [];
   const longAdvLines = [];
-  // Static stretches: many lines in a row with no visual change at all.
-  const staticRuns = []; let still = 0, stillStart = null, stillScene = null;
-  const VISUAL = new Set(['scene', 'bg', 'show', 'hide', 'move', 'cg', 'camera', 'weather', 'filter', 'tint', 'shake', 'flash', 'video', 'mode']);
-  const endStill = () => { if (still >= 30) staticRuns.push({ length: still, scene: stillScene, loc: stillStart }); still = 0; stillStart = null; };
   const gaps = []; let sinceInteraction = 0;
   let pendingVoice = false;
   const usesPersistentConditions = { ending_seen: false, persistent: false };
@@ -189,12 +410,9 @@ export function analyze(program) {
       if ((ins.name === 'scene' || ins.name === 'bg') && ins.args.kind === 'world') threeD = true;
       if (ins.name === 'cg' && ins.args.image) cgs.add(ins.args.image);
     }
-    if (ins.op === 'menu') { menus++; options += ins.options.length; gaps.push(sinceInteraction); sinceInteraction = 0; endStill(); }
-    if (ins.op === 'scene' || (ins.op === 'cmd' && VISUAL.has(ins.name))) endStill();
+    if (ins.op === 'menu') { menus++; options += ins.options.length; gaps.push(sinceInteraction); sinceInteraction = 0; }
     if (ins.op !== 'say') return;
     if (mode !== 'nvl') { const len = plainText(ins.text).length; if (len > 280 && len <= 600) longAdvLines.push({ length: len, loc: ins.loc, scene: ins.scene }); }
-    if ((ins.attrs && Object.keys(ins.attrs).length) || mode === 'nvl') endStill();
-    else { if (!still) { stillStart = ins.loc; stillScene = ins.scene; } still++; }
     const w = wordsOf(ins);
     words += w; lines++;
     if (isReach) reachableWords += w;
@@ -203,23 +421,17 @@ export function analyze(program) {
     const who = ins.who || (ins.name ? '"' + ins.name + '"' : null);
     if (!who) {
       narrationWords += w; narrationLines++;
-      if (run >= 30) dialogueRuns.push({ length: run, scene: ins.scene, loc: runStart });
-      run = 0;
     } else {
       dialogueWords += w; dialogueLines++;
-      if (pendingVoice) voiced++;
       const k = ins.who || ins.name;
-      perChar[k] = perChar[k] || { lines: 0, words: 0, name: ins.who ? program.decls.characters[ins.who].name : ins.name };
+      perChar[k] = perChar[k] || { lines: 0, words: 0, voiced: 0, name: ins.who ? program.decls.characters[ins.who].name : ins.name };
       perChar[k].lines++; perChar[k].words += w;
-      if (run === 0) runStart = ins.loc;
-      run++;
-      if (run > maxDialogueRun.length) maxDialogueRun = { length: run, scene: ins.scene, loc: runStart };
+      if (pendingVoice) { voiced++; perChar[k].voiced++; }
     }
     pendingVoice = false;
   });
   if (sinceInteraction) gaps.push(sinceInteraction);
-  endStill();
-  if (run >= 30) dialogueRuns.push({ length: run, scene: maxDialogueRun.scene, loc: runStart });
+  const { dialogueRuns, staticRuns, maxDialogueRun } = readingRuns(program, reach, sceneOf);
   for (const r of conditionRefs) {
     for (const c of r.calls) if (c.name === 'ending_seen' || c.name === 'endings_seen') usesPersistentConditions.ending_seen = true;
     for (const v of r.vars) { const d = program.decls.vars[v.name]; if (d && d.persistent) usesPersistentConditions.persistent = true; }
@@ -229,7 +441,6 @@ export function analyze(program) {
   const readingMinutes = reachableWords / wpm;
   const endings = Object.values(program.decls.endings);
   const graph = storyGraph(program);
-  const branchingScenes = new Set(graph.edges.filter(e => e.kind === 'choice' && e.to !== 'END').map(e => e.from));
   return {
     words: Math.round(words), reachableWords: Math.round(reachableWords), lines, narrationLines, dialogueLines,
     narrationShare: words ? narrationWords / words : 0,
@@ -247,7 +458,7 @@ export function analyze(program) {
     voicedDialogueShare: dialogueLines ? voiced / dialogueLines : 0,
     weather: [...weather], filters: [...filters], threeD, cgs: [...cgs],
     usesPersistentConditions,
-    branching: branchingScenes.size > 0,
+    branching: hasBranchingChoices(program, reach, sceneOf),
     graph,
   };
 }

@@ -97,6 +97,7 @@ export function vndbReport(program, opts = {}) {
   if (ex) {
     if (ex.errors.length) add('runtime', 'warn', 'Runtime errors on some routes', `${ex.errors.length} problem(s); run \`shiori explore\` for details.`);
     if (ex.truncated) add('explore', 'info', 'Route exploration was cut short', `The story has too many states to explore within --max-states ${ex.maxStates}; ending counts come from the @ending declarations instead.`);
+    else if (ex.unlocksPartial) add('explore', 'info', 'Route exploration was cut short', `After ${ex.playthroughs} playthroughs in a row from ${ex.unlockStates} different sets of endings seen and @persistent values, replaying still unlocked new ones; ending counts come from the @ending declarations instead.`);
     else if (ex.unreachedEndings.length) add('endings', 'warn', 'Some endings can never be reached', ex.unreachedEndings.map(e => `${e.title} [${e.id}]`).join(', ') + '.', 'Run `shiori explore` to see why.');
   }
 
@@ -114,14 +115,15 @@ export function vndbReport(program, opts = {}) {
   const animatedImages = Object.values(program.decls.assets).some(x => (x.kind === 'image' && x.opts.animated && x.usedAs && x.usedAs.cg));
   const bgEffects = a.weather.length > 0 || Object.values(program.decls.assets).some(x => (x.kind === 'world' && x.used && x.opts.animated !== false) || (x.kind === 'image' && x.opts.animated && !(x.usedAs && x.usedAs.cg)) || (x.kind === 'video' && x.opts.loop));
   const cutscenes = a.videos.filter(v => v.kind === 'cutscene').length;
-  const voiced = a.voicedDialogueShare === 0 ? 'Not voiced' : a.voicedDialogueShare >= 0.9 ? 'Fully voiced' : 'Partially voiced';
+  const voicing = voiceCoverage(program, a);
+  const voiced = voicing.status;
   const release = {
     title: h.title, original_title: h.original_title || null, romanized: h.romanized_title || null,
     type: h.release_type, status: h.status, released: h.release_date || 'TBA',
     language: h.language, machine_translation: ai.includes('translation') || ai.includes('all'),
     platforms: (h.platforms || []).map(p => PLATFORMS[p] || p),
     engine: 'Shiori', resolution: `${h.width}x${h.height}`,
-    voiced, has_ero: !!h.ero, min_age: h.age_rating != null ? h.age_rating : (h.ero ? 18 : null),
+    voiced, voiced_note: voicing.note, has_ero: !!h.ero, min_age: h.age_rating != null ? h.age_rating : (h.ero ? 18 : null),
     freeware: !!h.freeware, doujin: !!h.doujin, official: !!h.official, censoring: h.ero ? h.censored : 'n/a',
     animation: {
       story_sprites: usesModels ? '3D (realtime models)' : 'No animation',
@@ -144,7 +146,7 @@ export function vndbReport(program, opts = {}) {
   else tag('adv', 'All text is ADV.');
   if (!a.menus && !gameplayUses.length) tag('kinetic', 'No choices.');
   // Endings are declared statically; exploration can only confirm them.
-  const nEnd = ex && !ex.truncated ? Math.max(ex.endings.filter(e => e.id !== 'END').length, a.endings.length - ex.unreachedEndings.length) : a.endings.length;
+  const nEnd = ex && !ex.truncated && !ex.unlocksPartial ? Math.max(ex.endings.filter(e => e.id !== 'END').length, a.endings.length - ex.unreachedEndings.length) : a.endings.length;
   if (nEnd >= 2) tag('multi', `${nEnd} endings.`);
   else if (a.menus) tag('single', 'Choices but one ending.');
   if (a.branching) tag('branching', 'Choices lead to different scenes.');
@@ -186,6 +188,31 @@ export function vndbReport(program, opts = {}) {
   };
 }
 
+// VNDB (d3): "Fully voiced indicates that all characters (usually excluding
+// the protagonist and some minor characters) are voiced in all scenes."
+// So coverage is judged per character, leaving out the protagonist
+// (`role: protagonist`) and minor speakers: one-off "Name" speakers,
+// `role: appears`, and characters with under 5% of the dialogue lines.
+// 90% voiced counts as all (a stray unvoiced line is usually an oversight).
+function voiceCoverage(program, a) {
+  const speakers = Object.entries(a.perCharacter);
+  if (!speakers.some(([, v]) => v.voiced)) return { status: 'Not voiced', note: null };
+  const role = (k) => { const c = program.decls.characters[k]; return c && c.vndb ? c.vndb.role : null; };
+  const declared = speakers.filter(([k]) => program.decls.characters[k]);
+  const named = declared.filter(([k]) => role(k) !== 'protagonist');
+  const minor = (k, v) => role(k) === 'appears' || v.lines < 0.05 * a.dialogueLines;
+  let core = named.filter(([k, v]) => !minor(k, v));
+  if (!core.length) core = named.length ? named : speakers;
+  const short = core.filter(([, v]) => v.voiced < 0.9 * v.lines);
+  const inCore = new Set(core.map(([k]) => k));
+  const left = [];
+  if (speakers.some(([k]) => !inCore.has(k) && role(k) === 'protagonist')) left.push('the protagonist');
+  if (speakers.some(([k]) => !inCore.has(k) && role(k) !== 'protagonist')) left.push('minor speakers');
+  const note = left.length ? `Judged per character, not counting ${left.join(' and ')}.` : null;
+  if (!short.length) return { status: 'Fully voiced', note };
+  return { status: 'Partially voiced', note: `${note ? note + ' ' : ''}Not fully voiced: ${short.map(([, v]) => `${v.name} (${v.voiced} of ${v.lines} lines)`).join(', ')}.` };
+}
+
 function summGames(list) {
   const by = {};
   for (const g of list) by[g.id] = (by[g.id] || 0) + g.minutes;
@@ -219,7 +246,7 @@ export function formatVndb(r) {
   const rel = r.release;
   out.push(`- Type: ${rel.type} · Released: ${rel.released} · Language: ${rel.language}${rel.machine_translation ? ' (machine/AI translation)' : ''}`);
   out.push(`- Platforms: ${rel.platforms.join(', ') || '—'} · Engine: ${rel.engine} · Resolution: ${rel.resolution}`);
-  out.push(`- Voiced: ${rel.voiced} · Contains erotic scenes: ${rel.has_ero ? 'yes' : 'no'} · Minimum age: ${rel.min_age != null ? rel.min_age + '+' : 'not set (add `age_rating:`)'}`);
+  out.push(`- Voiced: ${rel.voiced}${rel.voiced_note ? ` (${rel.voiced_note})` : ''} · Contains erotic scenes: ${rel.has_ero ? 'yes' : 'no'} · Minimum age: ${rel.min_age != null ? rel.min_age + '+' : 'not set (add `age_rating:`)'}`);
   out.push(`- Freeware: ${rel.freeware ? 'yes' : 'no'} · Doujin: ${rel.doujin ? 'yes' : 'no'} · Official: ${rel.official ? 'yes' : 'no'}${rel.has_ero ? ` · Censoring: ${rel.censoring}` : ''}`);
   out.push(`- Animation — story sprites: ${rel.animation.story_sprites}; CGs: ${rel.animation.story_cgs}; cutscenes: ${rel.animation.cutscenes}; lip/eye movement: ${rel.animation.lip_eye_movement ? 'yes' : 'no'}; background effects: ${rel.animation.background_effects ? 'yes' : 'no'}.`);
   out.push(`  - ${rel.animation.note}`);
