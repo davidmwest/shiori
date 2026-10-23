@@ -2,6 +2,7 @@
 // endings, music room), confirm dialogs.
 
 import { el } from './ui.js';
+import { own } from './assets.js';
 
 const SLOTS_PER_PAGE = 9;
 const PAGES = 6;
@@ -252,7 +253,7 @@ export class Screens {
           const grid = el('div', 'sh-gallery', body);
           if (!cgs.length) el('p', 'sh-empty', body, 'This game has no event CGs.');
           for (const a of cgs) {
-            const open = !!per.cgs[a.id];
+            const open = !!own(per.cgs, a.id);
             const b = el('button', 'sh-cg' + (open ? '' : ' locked'), grid); b.type = 'button';
             if (open) b.style.backgroundImage = `url(${p.resolveUrl(a.path)})`;
             el('span', 'sh-cg-title', b, open ? (a.opts.title || a.id) : '???');
@@ -263,9 +264,9 @@ export class Screens {
         if (name === 'endings') {
           const list = el('div', 'sh-endings', body);
           const all = Object.values(decls.endings);
-          el('p', 'sh-ending-count', body, `${all.filter(e => per.endings[e.id]).length} of ${all.length} endings reached`);
+          el('p', 'sh-ending-count', body, `${all.filter(e => own(per.endings, e.id)).length} of ${all.length} endings reached`);
           for (const e of all) {
-            const got = per.endings[e.id];
+            const got = own(per.endings, e.id);
             const row = el('div', 'sh-ending' + (got ? '' : ' locked') + ' sh-kind-' + e.kind, list);
             el('span', 'sh-ending-kind', row, got ? e.kind : '?');
             el('span', 'sh-ending-title', row, got ? e.title : '???');
@@ -277,7 +278,7 @@ export class Screens {
           const list = el('div', 'sh-music', body);
           if (!tracks.length) el('p', 'sh-empty', body, 'No music yet.');
           for (const a of tracks) {
-            const open = !!per.music[a.id];
+            const open = !!own(per.music, a.id);
             const b = el('button', 'sh-track' + (open ? '' : ' locked'), list); b.type = 'button';
             el('span', 'sh-track-title', b, open ? (a.opts.title || a.id) : '???');
             b.disabled = !open;

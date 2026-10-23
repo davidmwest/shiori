@@ -2,6 +2,8 @@
 // voice, each on its own bus. Music can be an audio file or an LMN song,
 // which is synthesised live by the vendored LMN player.
 
+import { has } from '../core/registry.js';
+
 export class AudioMixer {
   constructor({ program, resolveUrl, settings, engineBase }) {
     this.program = program;
@@ -51,7 +53,8 @@ export class AudioMixer {
     for (const k of ['music', 'ambience', 'sound', 'voice']) this.bus[k].gain.setTargetAtTime(s[k] != null ? s[k] : 1, t, 0.03);
   }
 
-  asset(id) { return this.program.decls.assets[id]; }
+  // Own properties only: an id like `constructor` is never an Object.prototype member.
+  asset(id) { const t = this.program.decls.assets; return has(t, id) ? t[id] : null; }
   isLmn(a) { return a && /\.(lmn|txt)$/i.test(a.path); }
 
   async buffer(a) {
@@ -118,7 +121,9 @@ export class AudioMixer {
     const gain = c.createGain();
     gain.gain.value = 0;
     gain.connect(bus);
-    const deck = { id: spec.id, gain, vol: this.level(spec, a), loop: this.looping(spec, a, loopDefault), stopped: false };
+    // ended: a track that doesn't loop has played to its end. The deck is
+    // then silent, and asking for the track again starts it over.
+    const deck = { id: spec.id, gain, vol: this.level(spec, a), loop: this.looping(spec, a, loopDefault), stopped: false, ended: false };
     if (this.isLmn(a)) {
       const song = await this.song(a);
       if (!song || deck.stopped) return deck;
@@ -126,7 +131,7 @@ export class AudioMixer {
       p.ctx = c;
       p.master = { input: gain };
       p.setSong(song);
-      p.onEnd = () => { if (deck.loop && !deck.stopped) p.play(0); };
+      p.onEnd = () => { if (deck.loop && !deck.stopped) p.play(0); else deck.ended = true; };
       deck.lmn = p;
       p.play(0);
     } else {
@@ -135,11 +140,16 @@ export class AudioMixer {
       const src = c.createBufferSource();
       src.buffer = buf; src.loop = deck.loop;
       src.connect(gain);
+      src.onended = () => { deck.ended = true; };
       src.start();
       deck.src = src;
     }
     return deck;
   }
+
+  // Is this deck still playing track `id`? A finished one-shot track is not,
+  // unless `keepEnded` (a rollback must not start it over).
+  playing(deck, id, keepEnded) { return !!deck && deck.id === id && !deck.stopped && (keepEnded || !deck.ended); }
 
   // The track on this deck is asked for again (a new volume= or loop=, or a
   // sync after loading): it keeps playing and moves to the new level.
@@ -174,10 +184,12 @@ export class AudioMixer {
     }, f * 1000 + 80);
   }
 
-  async playMusic(spec, fade = 1.5) {
+  // keepEnded: a restore after rollback or rollforward, where a one-shot
+  // track that has finished stays silent instead of starting over.
+  async playMusic(spec, fade = 1.5, keepEnded = false) {
     this.wanted.music = spec;
     if (!this.ctx) return;
-    if (this.music && this.music.id === spec.id && !this.music.stopped) {
+    if (this.playing(this.music, spec.id, keepEnded)) {
       this.musicToken = (this.musicToken || 0) + 1; // a track still loading must not replace it
       this.retune(this.music, spec, fade, true);
       return;
@@ -198,10 +210,10 @@ export class AudioMixer {
     this.music = null;
   }
 
-  async playAmbience(spec, fade = 1) {
+  async playAmbience(spec, fade = 1, keepEnded = false) {
     this.wanted.ambience = spec;
     if (!this.ctx) return;
-    if (this.ambience && this.ambience.id === spec.id && !this.ambience.stopped) {
+    if (this.playing(this.ambience, spec.id, keepEnded)) {
       this.ambToken = (this.ambToken || 0) + 1;
       this.retune(this.ambience, spec, fade, true);
       return;
@@ -283,9 +295,12 @@ export class AudioMixer {
     }
   }
 
-  sync(audio) {
-    if (audio.music) this.playMusic(audio.music, 0.6); else this.stopMusic(0.6);
-    if (audio.ambience) this.playAmbience(audio.ambience, 0.6); else this.stopAmbience(0.6);
+  // Make the audio match a restored state. After a load the state's tracks
+  // play as in a fresh session; `keepEnded` (rollback, rollforward) leaves a
+  // finished one-shot track silent.
+  sync(audio, { keepEnded = false } = {}) {
+    if (audio.music) this.playMusic(audio.music, 0.6, keepEnded); else this.stopMusic(0.6);
+    if (audio.ambience) this.playAmbience(audio.ambience, 0.6, keepEnded); else this.stopAmbience(0.6);
   }
 
   // Music room: play a track directly.

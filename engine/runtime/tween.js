@@ -1,5 +1,7 @@
 // Easing curves and a small tween manager shared by the stage and UI.
 
+import { has } from '../core/registry.js';
+
 export const EASE = {
   linear: (t) => t,
   in: (t) => t * t * t,
@@ -21,7 +23,7 @@ export const lerp = (a, b, t) => a + (b - a) * t;
 export class Tweens {
   constructor() { this.list = []; }
   add(duration, step, opts = {}) {
-    const tw = { t: 0, d: Math.max(0, duration || 0), step, ease: EASE[opts.ease || 'inout'] || EASE.inout, done: opts.done, key: opts.key };
+    const tw = { t: 0, d: Math.max(0, duration || 0), step, ease: has(EASE, opts.ease) ? EASE[opts.ease] : EASE.inout, done: opts.done, key: opts.key };
     if (opts.key) this.cancel(opts.key, true);
     if (tw.d === 0) { step(1); if (tw.done) tw.done(); return tw; }
     step(0);

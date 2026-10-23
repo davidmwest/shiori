@@ -5,8 +5,9 @@ import { prepareProject } from '../core/compiler.js';
 import { VM } from '../core/vm.js';
 import { formatDiagnostic, summary } from '../core/diagnostics.js';
 import { fillTemplate } from '../core/assets.js';
+import { has } from '../core/registry.js';
 import { Stage } from './stage2d.js';
-import { Assets } from './assets.js';
+import { Assets, own, attrsOf } from './assets.js';
 import { AudioMixer } from './audio.js';
 import { TextUI, el } from './ui.js';
 import { Screens } from './screens.js';
@@ -228,10 +229,10 @@ export class Player {
     this.inGame = true;
     this.stopModes();
     if (this.params.skip) this.setSkip(true);
-    const vars = {};
+    const vars = Object.create(null); // `?set=` names are the script's variable names
     if (this.params.set) for (const kv of String(this.params.set).split(',')) {
       const [k, v] = kv.split(/[:=]/);
-      const d = this.program.decls.vars[k];
+      const d = own(this.program.decls.vars, k);
       if (d) vars[k] = d.type === 'number' ? Number(v) : d.type === 'bool' ? v === 'true' : v;
     }
     this.handle(this.vm.start(scene || null, { vars }));
@@ -259,7 +260,8 @@ export class Player {
     switch (e.type) {
       case 'restore':
         this.stage.sync(e.stage);
-        this.audio.sync(e.audio);
+        // A rollback doesn't start a finished one-shot track over; a load does.
+        this.audio.sync(e.audio, { keepEnded: !!(e.rollback || e.rollforward) });
         this.ui.sync(e.text);
         this.ui.showBox(e.stage.textbox !== false);
         return;
@@ -272,7 +274,7 @@ export class Player {
         if (this.dev) this.dev.log(e);
         return;
       default: {
-        const fn = this.effectHandlers[e.type];
+        const fn = has(this.effectHandlers, e.type) ? this.effectHandlers[e.type] : null;
         if (fn) { try { fn(e, this); } catch (err) { console.warn('[shiori] effect handler failed', e.type, err); } }
         // `scene` marks each scene entry, for modules and tools; the player has nothing to do.
         else if (e.type !== 'scene') console.warn('[shiori] no handler for effect', e.type);
@@ -504,7 +506,7 @@ export class Player {
     this.audio.stopVoice();
     const h = this.program.header;
     const id = h.title_background;
-    const a = id && this.program.decls.assets[id];
+    const a = id ? own(this.program.decls.assets, id) : null;
     const stage = { bg: a ? { kind: a.kind === 'world' ? 'world' : 'image', id } : { kind: 'color', color: '#0b0e1c' }, actors: [], cg: null,
       camera: { zoom: 1, x: 0, y: 0, rotate: 0, from: a && a.opts.camera || null, look: null, fov: null },
       weather: a ? null : { type: 'stars', intensity: 1, wind: 0, layer: 'front' }, filter: 'none', tint: null, textbox: false };
@@ -522,7 +524,7 @@ export class Player {
 
   playTitleMusic() {
     const t = this.program.header.title_music;
-    if (t && this.program.decls.assets[t]) this.audio.playMusic({ id: t, volume: 1, loop: true }, 1.5);
+    if (t && own(this.program.decls.assets, t)) this.audio.playMusic({ id: t, volume: 1, loop: true }, 1.5);
     else this.audio.stopMusic(1.5);
   }
 
@@ -563,7 +565,7 @@ export class Player {
 
   playVideo(h) {
     this.ui.showBox(false);
-    const a = this.program.decls.assets[h.id];
+    const a = own(this.program.decls.assets, h.id);
     const layer = this.videoLayer;
     layer.textContent = '';
     layer.classList.add('on');
@@ -580,9 +582,9 @@ export class Player {
 
   sidePortrait(h) {
     if (!h.who) return null;
-    const c = this.program.decls.characters[h.who];
+    const c = own(this.program.decls.characters, h.who);
     if (!c || !c.side) return null;
-    return this.resolveUrl(fillTemplate(c.side, { ...c.defaults, ...(h.attrs || {}) }));
+    return this.resolveUrl(fillTemplate(c.side, attrsOf(c, h.attrs)));
   }
 
   toggleFullscreen() {

@@ -1,5 +1,7 @@
 // Weather and ambient particle systems drawn on the stage canvas.
 
+import { has } from '../core/registry.js';
+
 const rand = (a, b) => a + Math.random() * (b - a);
 
 function softDot(color, r) {
@@ -74,6 +76,7 @@ const KINDS = {
 export class Weather {
   constructor(spec, W, H) {
     this.type = spec.type;
+    this.kind = has(KINDS, spec.type) ? KINDS[spec.type] : null;
     this.W = W; this.H = H;
     this.alpha = 0; this.target = 1;
     this.setSpec(spec);
@@ -85,7 +88,8 @@ export class Weather {
     this.intensity = spec.intensity != null ? spec.intensity : 1;
     this.wind = spec.wind || 0;
     this.layer = spec.layer || 'front';
-    const k = KINDS[this.type];
+    const k = this.kind;
+    if (!k) { this.parts = []; return; } // an unknown type (an old save) draws nothing
     const n = Math.round(k.count * Math.max(0.05, this.intensity));
     this.parts = this.parts || [];
     while (this.parts.length < n) { const p = {}; k.spawn(p, this.W, this.H, this, true); this.parts.push(p); }
@@ -94,7 +98,8 @@ export class Weather {
   update(dt) {
     const { W, H } = this;
     this.t += dt;
-    const k = KINDS[this.type];
+    const k = this.kind;
+    if (!k) return;
     const wind = this.wind;
     for (const p of this.parts) {
       switch (this.type) {
