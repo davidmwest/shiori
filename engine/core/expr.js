@@ -6,8 +6,8 @@
 export const FUNCTIONS = {
   visited:     { args: ['label'], doc: 'How many times the scene has been entered in this playthrough (0 if never).' },
   ending_seen: { args: ['ending'], doc: 'True if this ending has been reached in any playthrough (persistent).' },
-  endings_seen:{ args: [], doc: 'How many different endings have been reached across all playthroughs.' },
-  random:      { args: ['number', 'number'], doc: 'A whole number from a to b, inclusive. Deterministic per save.' },
+  endings_seen:{ args: [], doc: 'How many of this game\'s endings have been reached across all playthroughs. Endings that are no longer in the game don\'t count.' },
+  random:      { args: ['number', 'number'], doc: 'A whole number from a to b, inclusive, with the bounds in either order: random(6, 1) is the same as random(1, 6). Deterministic per save.' },
   chance:      { args: ['number'], doc: 'True with probability p (0 to 1). Deterministic per save.' },
   count:       { args: ['bool'], variadic: true, doc: 'How many of the conditions are true: count(clue_a, clue_b, clue_c) >= 2.' },
   min:         { args: ['number', 'number'], variadic: true, doc: 'Smallest value.' },
