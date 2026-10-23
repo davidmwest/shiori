@@ -5,11 +5,11 @@
 
 import { parseFile } from './parser.js';
 import { Diagnostics } from './diagnostics.js';
-import { parseExpr, parseAssignment, collectRefs, FUNCTIONS, ExprError, typeOf } from './expr.js';
+import { parseExpr, parseAssignment, collectRefs, FUNCTIONS, ExprError, typeOf, exprToString } from './expr.js';
 import { parseMarkup, plainText } from './markup.js';
 import { bindArgs, checkValue, has, POSITIONS } from './registry.js';
 import { HEADER_FIELDS, AI_PARTS, PLATFORMS } from './header.js';
-import { didYouMean, hash, isColor } from './util.js';
+import { didYouMean, hash, isColor, isIdent } from './util.js';
 import { defaultRegistry } from './modules/index.js';
 
 export const ENTRY = 'game.story';
@@ -48,19 +48,26 @@ export function canonPath(p) {
   return (s.startsWith('/') ? '/' : '') + out.join('/');
 }
 
+// A UTF-8 byte order mark is not part of the text. Browsers drop it when
+// they read a file, so the stored text (and the program hash) match theirs.
+const stripBom = (t) => typeof t === 'string' && t.charCodeAt(0) === 0xFEFF ? t.slice(1) : t;
+
 // Read game.story and every file it includes. readText(path) -> string | null
 // (may return a Promise). Paths are relative to the game folder.
-export async function loadSources(readText, entry = ENTRY) {
+// opts.registry: the commands to parse with (module commands that take a
+// property block); the built-in ones by default.
+export async function loadSources(readText, entry = ENTRY, opts = {}) {
+  const registry = opts.registry || defaultRegistry();
   const sources = { entry, files: Object.create(null), order: [], missing: [] };
-  const main = await readText(entry);
+  const main = stripBom(await readText(entry));
   if (main == null) { sources.missing.push({ path: entry }); return sources; }
   sources.files[entry] = main;
   sources.order.push(entry);
-  const parsed = parseFile(entry, main, { isMain: true, diags: new Diagnostics() });
+  const parsed = parseFile(entry, main, { isMain: true, diags: new Diagnostics(), registry });
   for (const inc of parsed.includes) {
     const path = canonPath(inc.path);
     if (sources.files[path] != null) continue;
-    const text = await readText(path);
+    const text = stripBom(await readText(path));
     if (text == null) { sources.missing.push({ path, loc: inc.loc }); continue; }
     sources.files[path] = text;
     sources.order.push(path);
@@ -71,13 +78,16 @@ export async function loadSources(readText, entry = ENTRY) {
 // Load sources, import the game's own modules (header `modules:`), compile.
 // importModule(path) -> Promise<module>; readText(path) -> string | null.
 export async function prepareProject({ readText, importModule, listing, extraModules = [] }) {
-  const sources = await loadSources(readText);
+  // The game's own modules are known only after the header is read, so the
+  // first reads use the built-in commands (and any extra modules).
+  const base = defaultRegistry(extraModules);
+  const sources = await loadSources(readText, ENTRY, { registry: base });
   if (listing) sources.listing = listing;
   const loaded = [];
   const errors = [];
   const main = sources.files[ENTRY];
   if (main && importModule) {
-    const parsed = parseFile(ENTRY, main, { isMain: true, diags: new Diagnostics() });
+    const parsed = parseFile(ENTRY, main, { isMain: true, diags: new Diagnostics(), registry: base });
     const entry = parsed.header.modules;
     const list = entry ? (Array.isArray(entry) ? entry : [entry]).flatMap(e => e.value.split(/[\s,]+/).filter(Boolean).map(p => ({ p, loc: e.loc }))) : [];
     for (const { p, loc } of list) {
@@ -106,7 +116,7 @@ export function compileProject(sources, opts = {}) {
   const entry = sources.entry || ENTRY;
   const parsed = [];
   for (const path of sources.order) {
-    parsed.push(parseFile(path, sources.files[path], { isMain: path === entry, diags }));
+    parsed.push(parseFile(path, sources.files[path], { isMain: path === entry, diags, registry }));
   }
   for (const m of sources.missing || []) {
     if (m.path === entry) diags.error('E113', `Could not find ${entry}. Every game starts from a game.story file in its folder.`, { file: entry, line: 1 });
@@ -219,7 +229,7 @@ export function compileProject(sources, opts = {}) {
         if (def.compile && !(args && args.bad)) def.compile(n, ctx, args, null);
         continue;
       }
-      diags.error('E103', `\`@${n.name}\` must be inside a scene; only declarations may come before the first \`# scene_id\`.`, n.loc,
+      diags.error('E103', `\`@${n.name}\` must be inside a scene; only declarations and \`@note\` may come before the first \`# scene_id\`.`, n.loc,
         'Move it below the `# scene_id` line of the scene it belongs to, so it runs when that scene plays.');
     }
   }
@@ -260,7 +270,42 @@ export function compileProject(sources, opts = {}) {
     return scene + ':c' + hash(text) + (n > 1 ? '.' + n : '');
   }
 
+  // Declarations apply wherever they stand and @note is for authors, so
+  // neither is "code" that a jump can skip.
+  const inert = (n) => {
+    if (n.type !== 'cmd') return false;
+    const def = registry.get(n.name);
+    return !!def && (isDecl(def, n) || !!def.topLevel);
+  };
+
+  // W622: the lines after a node that always leaves its block never run.
+  function reportDeadCode(nodes) {
+    const i = nodes.findIndex(leaves);
+    if (i < 0) return;
+    const dead = nodes.slice(i + 1).find(n => !inert(n));
+    if (!dead) return;
+    const exit = nodes[i];
+    const what = dead.type === 'menu' ? 'These choices are never shown' : dead.type === 'if' ? 'This `@if` never runs' : 'This line never runs';
+    const [it, obj] = dead.type === 'menu' ? ['they come', 'them'] : ['it comes', 'it'];
+    let msg, hint;
+    if (exit.type === 'menu') {
+      msg = `${what}: every choice in the menu above jumps away.`;
+      hint = `Move ${obj} into the choices that should lead there, above their jumps, or give one choice no jump so the story continues here.`;
+    } else if (exit.type === 'if') {
+      msg = `${what}: every branch of the \`@if\` above jumps away.`;
+      hint = `Move ${obj} into the branches that should run ${obj}, above their jumps.`;
+    } else {
+      const jump = exit.type === 'jump' ? `-> ${exit.target}` : exit.name === 'return' ? '@return' : `@jump ${exit.args[0] ? exit.args[0].value : ''}`.trim();
+      msg = `${what}: ${it} after \`${jump}\`.`;
+      hint = dead.type === 'cmd' && dead.name === 'ending'
+        ? `Put the \`@ending\` line above \`${jump}\`, so the ending is recorded.`
+        : `Move ${obj} above the jump, or delete ${obj}.`;
+    }
+    diags.warn('W622', msg, dead.loc, hint);
+  }
+
   function compileBody(nodes, sc, depth) {
+    reportDeadCode(nodes);
     nodes.forEach((n, i) => {
       compileNode(n, sc, depth);
       // An ending that jumps straight back into the story is usually a slip.
@@ -288,11 +333,23 @@ export function compileProject(sources, opts = {}) {
           const byId = ids.find(k => k.toLowerCase() === lower);
           const byName = Object.values(decls.characters).find(c => (c.name || '').toLowerCase() === lower);
           const byWord = Object.values(decls.characters).find(c => (c.name || '').toLowerCase().split(/[\s.,'’-]+/).includes(lower));
+          // `O'Brien:` / `Élodie:` can't be ids; their ASCII spelling may be one.
+          const validId = isIdent(n.speaker);
+          const folded = validId ? '' : asciiId(n.speaker);
+          const byAscii = folded && ids.find(k => k.toLowerCase() === folded);
           let hint;
           if (byId) hint = `Character ids are case-sensitive: write \`${byId}:\`.`;
           else if (byName) hint = `Use the character's id, not their display name: \`${byName.id}:\`.`;
           else if (byWord) hint = `Did you mean \`${byWord.id}\` (${byWord.name})? Dialogue uses the character's id.`;
-          else {
+          else if (byAscii) hint = `Character ids use only ASCII letters, digits and \`_\`: write \`${byAscii}:\`.`;
+          else if (!validId) {
+            const m = folded && didYouMean(folded, ids);
+            const free = (k) => isIdent(k) && !RESERVED_IDS.includes(k) && !decls.characters[k] && !decls.assets[k];
+            let id = free(folded) ? folded : '';
+            for (let k = 1; !id; k++) if (free(`c${k}`)) id = `c${k}`;
+            hint = m ? `Did you mean \`${m}\`? Character ids use only ASCII letters, digits and \`_\`.`
+              : `Character ids use only ASCII letters, digits and \`_\`: declare \`@character ${id} name="${n.speaker}"\` and write \`${id}: ...\`, write \`"${n.speaker}": ...\` for a one-off speaker, or start the line with \`| \` if it is narration.`;
+          } else {
             const m = didYouMean(n.speaker, ids);
             hint = m ? `Did you mean \`${m}\`?` : `Declare the character with \`@character ${n.speaker} name="..."\`, write \`"${n.speaker}": ...\` for a one-off speaker, or start the line with \`| \` if it is narration.`;
           }
@@ -334,6 +391,10 @@ export function compileProject(sources, opts = {}) {
         return;
       }
       if (!opt.body.length) return; // gather: continue after the menu
+      if (opt.target && opt.body.some(leaves)) {
+        diags.warn('W622', `The \`-> ${opt.target}\` on this choice never runs: the lines under it always jump away first.`, opt.loc,
+          `Keep one of the two jumps: delete \`-> ${opt.target}\` from the choice line, or the jump in the lines under it.`);
+      }
       o.pc = code.length;
       compileBody(opt.body, sc, depth + 1);
       if (opt.target) emitJump(opt.target, opt.loc, sc);
@@ -348,8 +409,19 @@ export function compileProject(sources, opts = {}) {
 
   function compileIf(n, sc, depth) {
     const ends = [];
+    const tested = new Map(); // condition -> the branch that tests it first
     n.branches.forEach((b, i) => {
       const cond = ctx.compileExpr(b.cond || 'false', b.loc, b.condCol);
+      // An @elif that repeats an earlier condition never runs: nothing can
+      // change between the two tests (random() and chance() roll again).
+      if (cond && b.cond && !collectRefs(cond).calls.some(c => c.name === 'random' || c.name === 'chance')) {
+        const key = exprToString(cond);
+        const first = tested.get(key);
+        if (first) {
+          diags.warn('W622', `This \`@elif\` never runs: the \`@${first.i === 0 ? 'if' : 'elif'}\` at line ${first.loc.line} tests the same condition first.`, b.loc,
+            'Change one of the two conditions, or move these lines into the first branch.');
+        } else tested.set(key, { i, loc: b.loc });
+      }
       const br = emit({ op: 'branch', cond, else: null, loc: L(b.loc), scene: sc.id });
       compileBody(b.body, sc, depth + 1);
       const more = i < n.branches.length - 1 || n.elseBody;
@@ -481,7 +553,9 @@ export function compileProject(sources, opts = {}) {
   }
 
   // ---- files that exist but were never included ----------------------
-  if (sources.listing) {
+  // (Without game.story nothing is included, so that is E113 alone.)
+  const entryMissing = (sources.missing || []).some(m => m.path === entry);
+  if (sources.listing && !entryMissing) {
     const loaded = new Set(sources.order.map(canonPath));
     for (const raw of sources.listing) {
       const p = canonPath(raw);
@@ -495,7 +569,7 @@ export function compileProject(sources, opts = {}) {
     format: 'shiori-program', version: 1,
     hash: hash(sources.order.map(p => p + '\n' + sources.files[p]).join('\n\u0000')),
     header, start, code, labels,
-    scenes: Object.assign(table(), Object.fromEntries(sceneOrder.map(id => [id, { id, title: sceneMap[id].title, file: sceneMap[id].file, line: sceneMap[id].loc.line, pc: labels[id], args: sceneMap[id].args }]))),
+    scenes: Object.assign(table(), Object.fromEntries(sceneOrder.map(id => [id, { id, title: sceneMap[id].title, file: sceneMap[id].file, line: sceneMap[id].loc.line, pc: labels[id] }]))),
     sceneOrder, decls, lines, files: sources.order.slice(),
     notes,
   };
@@ -503,6 +577,29 @@ export function compileProject(sources, opts = {}) {
 }
 
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// Words that can't name a character or asset.
+const RESERVED_IDS = ['all', 'none', 'stop', 'cg', 'black', 'white'];
+
+// An ASCII spelling of a name for an id hint: `O'Brien` -> `obrien`,
+// `Élodie` -> `elodie`, `Jean-Luc` -> `jean_luc`; '' if no ASCII is left.
+const FOLD = { ß: 'ss', æ: 'ae', œ: 'oe', ø: 'o', ł: 'l', đ: 'd', ð: 'd', þ: 'th', ı: 'i' };
+function asciiId(name) {
+  return String(name).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+    .replace(/[ßæœøłđðþı]/g, (c) => FOLD[c])
+    .replace(/['’]/g, '').replace(/[^a-z0-9_]+/g, '_').replace(/^[_0-9]+|_+$/g, '');
+}
+
+// Does running this node always leave its block (a jump, `@return`, or a
+// menu / @if whose every path does)? Unlike terminates(), every line of a
+// block counts, not only the last one.
+export function leaves(n) {
+  if (n.type === 'jump') return true;
+  if (n.type === 'cmd') return n.name === 'return' || (n.name === 'jump' && n.args.length > 0);
+  if (n.type === 'menu') return !menuCanBeSkipped(n) && n.options.every(o => o.target || o.body.some(leaves));
+  if (n.type === 'if') return !!n.elseBody && n.elseBody.some(leaves) && n.branches.every(b => b.body.some(leaves));
+  return false;
+}
 
 // Can every option of this menu be unavailable (hidden by [if], locked by
 // [require], or used up by [once])? Then the VM skips the menu (R704).
@@ -534,6 +631,8 @@ const CALL_EXAMPLES = {
   len: 'len(name)', upper: 'upper(name)', lower: 'lower(name)',
 };
 const KEYWORDS = ['true', 'false', 'and', 'or', 'not'];
+const CMP_OPS = ['==', '!=', '<', '<=', '>', '>='];
+const ORDER_OPS = ['<', '<=', '>', '>='];
 
 function makeContext({ diags, registry, decls, header, sceneMap, sceneOrder, endingRefs, notes }) {
   const kindsOf = (kinds) => kinds && kinds.length ? kinds : null;
@@ -672,6 +771,35 @@ function makeContext({ diags, registry, decls, header, sceneMap, sceneOrder, end
           }
         });
       }
+      ctx.checkOrdering(ast, { ...loc, col: col || loc.col });
+    },
+
+    // W623: `<`, `<=`, `>`, `>=` with a true/false side, like `(1 < x) < 5`
+    // (true for every x > 1) or `met_rin > 0`. The language allows it, but it
+    // is almost never what was meant.
+    checkOrdering(ast, at) {
+      if (!ast) return;
+      if (ast.t === 'un') return ctx.checkOrdering(ast.a, at);
+      if (ast.t === 'call') return ast.args.forEach(a => ctx.checkOrdering(a, at));
+      if (ast.t !== 'bin') return;
+      ctx.checkOrdering(ast.a, at);
+      ctx.checkOrdering(ast.b, at);
+      if (!ORDER_OPS.includes(ast.op)) return;
+      const boolA = ctx.typeOf(ast.a) === 'bool', boolB = ctx.typeOf(ast.b) === 'bool';
+      if (!boolA && !boolB) return;
+      const text = (e) => exprToString(e).replace(/^\((.*)\)$/, '$1');
+      const side = boolA ? ast.a : ast.b;
+      let hint;
+      if (boolA && ast.a.t === 'bin' && CMP_OPS.includes(ast.a.op) && !boolB) {
+        const mid = exprToString(ast.a.b);
+        hint = `To test a range, write \`${exprToString(ast.a.a)} ${ast.a.op} ${mid} and ${mid} ${ast.op} ${exprToString(ast.b)}\`.`;
+      } else if (side.t === 'var' || side.t === 'call') {
+        const s = exprToString(side);
+        hint = `\`${s}\` is true or false: test it directly (\`${s}\`, \`not ${s}\`) or with \`==\`.`;
+      } else {
+        hint = '`<`, `<=`, `>` and `>=` compare numbers. Test a true/false value directly, or with `==`.';
+      }
+      diags.warn('W623', `\`${text(ast)}\` compares a true/false value with \`${ast.op}\`.`, at, hint);
     },
 
     varType(name) { const v = decls.vars[name]; return v ? v.type : null; },
@@ -718,7 +846,7 @@ function makeContext({ diags, registry, decls, header, sceneMap, sceneOrder, end
         diags.error('E204', `\`${id}\` is already declared (at ${prev.loc.file}:${prev.loc.line}).`, loc, 'Characters and assets share one set of names; pick a different id.');
         return false;
       }
-      if (id === 'all' || id === 'none' || id === 'stop' || id === 'cg' || id === 'black' || id === 'white') {
+      if (RESERVED_IDS.includes(id)) {
         diags.error('E204', `\`${id}\` is a reserved word and can't be used as a name.`, loc);
         return false;
       }

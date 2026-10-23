@@ -224,7 +224,7 @@ export default {
       declare: declareVar(true),
     },
     {
-      name: 'position', decl: true,
+      name: 'position', decl: true, props: true,
       summary: 'Name a horizontal stage position for 2D scenes.',
       syntax: '@position <name> x=<0..1> [y=0] [scale=1]',
       positional: [{ name: 'name', type: 'ident', required: true, doc: 'The position name' }],
