@@ -13,10 +13,16 @@
 //   decl        true for compile-time declarations (no runtime effect)
 //   examples    ['@show mio smile at=left']
 //   compile(cmd, ctx) -> instruction | null   (optional; default builds {op:'cmd'})
+//   topLevel    true if the command may also stand before the first scene
+//               (compile() then runs with no scene and its output is dropped)
 //   exec(ins, vm)                              (runtime; may emit effects / halt)
 //   vndb        notes for the VNDB report (e.g. { gameplay: true })
 
 import { didYouMean, parseDuration, isColor, isIdent } from './util.js';
+
+// Own-property lookup, so user names like `constructor` or `toString` never
+// match something inherited from Object.prototype.
+export function has(obj, key) { return obj != null && Object.prototype.hasOwnProperty.call(obj, key); }
 
 export class Registry {
   constructor() { this.commands = new Map(); this.modules = []; this.aliases = new Map(); }
@@ -99,8 +105,8 @@ export function checkValue(type, raw, ctx, info = {}) {
     case 'label': return ctx.checkLabel(s);
     case 'ending': return isIdent(s) ? { value: s } : { error: `\`${s}\` is not a valid ending id.` };
     case 'position': {
-      if (POSITIONS[s] != null) return { value: POSITIONS[s] };
-      if (ctx.positions && ctx.positions[s]) return { value: ctx.positions[s].x, named: s };
+      if (has(POSITIONS, s)) return { value: POSITIONS[s] };
+      if (has(ctx.positions, s)) return { value: ctx.positions[s].x, named: s };
       const n = s.endsWith('%') ? Number(s.slice(0, -1)) / 100 : Number(s);
       if (s !== '' && isFinite(n)) return { value: n };
       // In 3D worlds, any other name is a mark in the world.
@@ -110,7 +116,7 @@ export function checkValue(type, raw, ctx, info = {}) {
       return { error: `\`${s}\` is not a position.`, hint: m ? `Did you mean \`${m}\`?` : 'Use left, center, right, farleft, farright, or a number from 0 (left edge) to 1 (right edge).' };
     }
     case 'transition': {
-      if (TRANSITIONS[s]) return { value: s };
+      if (has(TRANSITIONS, s)) return { value: s };
       const m = didYouMean(s, Object.keys(TRANSITIONS));
       return { error: `\`${s}\` is not a transition.`, hint: m ? `Did you mean \`${m}\`?` : `Transitions: ${Object.keys(TRANSITIONS).join(', ')}.` };
     }
@@ -129,7 +135,7 @@ export function checkValue(type, raw, ctx, info = {}) {
 // Bind tokenized arguments (and property-block lines) to a command schema.
 // Returns { pos: [values...], named: {key: value}, rest: [...] }.
 export function bindArgs(def, cmd, ctx) {
-  const out = { pos: {}, named: {}, extra: {}, rest: [] };
+  const out = { pos: {}, named: {}, extra: Object.create(null), rest: [] };
   const positional = def.positional || [];
   const named = def.named || {};
   let pi = 0;
@@ -138,7 +144,7 @@ export function bindArgs(def, cmd, ctx) {
   for (const a of all) {
     const at = a.loc || { ...cmd.loc, col: a.col };
     if (a.key) {
-      const spec = named[a.key];
+      const spec = has(named, a.key) ? named[a.key] : null;
       if (!spec) {
         if (def.extraNamed) { out.extra[a.key] = a.value; continue; }
         const m = didYouMean(a.key, Object.keys(named));
@@ -151,6 +157,8 @@ export function bindArgs(def, cmd, ctx) {
       if (spec.repeat) (out.named[a.key] = out.named[a.key] || []).push(r.value);
       else out.named[a.key] = r.value;
       if (r.mark) out.named[a.key + 'Mark'] = true;
+      // A declared @position: keep its name so y/scale come from it by name.
+      if (r.named) out.named[a.key + 'Name'] = r.named;
       continue;
     }
     const spec = positional[pi];
@@ -165,6 +173,8 @@ export function bindArgs(def, cmd, ctx) {
     if (r.error) { ctx.diags.error(r.code || 'E303', r.error, at, r.hint); out.pos[spec.name] = undefined; out.bad = true; continue; }
     out.pos[spec.name] = r.value;
     if (r.kind) out.pos[spec.name + 'Kind'] = r.kind;
+    if (r.mark) out.pos[spec.name + 'Mark'] = true;
+    if (r.named) out.pos[spec.name + 'Name'] = r.named;
   }
   for (let i = 0; i < positional.length; i++) {
     const spec = positional[i];

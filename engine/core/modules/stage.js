@@ -2,8 +2,8 @@
 // and props, event CGs, camera, weather, filters. Commands change the stage
 // model in the VM state; renderers animate the change.
 
-import { POSITIONS, COLOR_BACKGROUNDS } from '../registry.js';
-import { clone } from '../util.js';
+import { POSITIONS, COLOR_BACKGROUNDS, has } from '../registry.js';
+import { clone, isColor, didYouMean } from '../util.js';
 
 export const WEATHER = {
   rain: 'Falling rain streaks.',
@@ -52,6 +52,29 @@ function bgValue(id, kind) {
   return { kind: kind === 'world' ? 'world' : 'image', id };
 }
 
+// Place an actor at `at=`: a 3D mark, a declared @position (by name: its x,
+// y and scale), or a built-in name / number (x only).
+function placeAt(actor, a, vm) {
+  if (a.at == null) return;
+  if (a.atMark) { actor.mark = a.at; return; }
+  actor.x = a.at; actor.mark = null;
+  const positions = vm.program.decls.positions;
+  const p = a.atName && has(positions, a.atName) ? positions[a.atName] : null;
+  if (p) {
+    if (p.x != null) actor.x = p.x;
+    if (p.y != null) actor.y = p.y;
+    if (p.scale != null) actor.scale = p.scale;
+  }
+}
+
+// The camera a world starts with (its camera= mark), or the default one.
+function startCamera(vm, bg) {
+  const cam = newStage().camera;
+  const world = bg && bg.kind === 'world' ? vm.program.decls.assets[bg.id] : null;
+  if (world && world.opts && world.opts.camera) cam.from = world.opts.camera;
+  return cam;
+}
+
 function autoX(stage) {
   for (const x of [POSITIONS.center, POSITIONS.left, POSITIONS.right, POSITIONS.farleft, POSITIONS.farright]) {
     if (!stage.actors.some(a => typeof a.x === 'number' && Math.abs(a.x - x) < 0.08)) return x;
@@ -81,9 +104,7 @@ export default {
         const old = clone(s);
         s.bg = bgValue(a.bg, a.kind);
         s.actors = []; s.cg = null; s.weather = null; s.filter = 'none'; s.tint = null;
-        s.camera = newStage().camera;
-        const world = s.bg.kind === 'world' ? vm.program.decls.assets[s.bg.id] : null;
-        if (world && world.opts.camera) s.camera.from = world.opts.camera;
+        s.camera = startCamera(vm, s.bg);
         vm.emit({ type: 'stage', op: 'scene', stage: clone(s), from: old, with: a.with, time: a.time != null ? a.time : 1 });
         finishTransition(vm, a, true, 1);
       },
@@ -98,8 +119,16 @@ export default {
       compile(cmd, ctx, args) { return { op: 'cmd', name: 'bg', args: { bg: args.pos.bg, kind: args.pos.bgKind, ...args.named } }; },
       exec(ins, vm) {
         const a = ins.args, s = vm.state.stage;
+        const prevWorld = s.bg && s.bg.kind === 'world' ? s.bg.id : null;
         s.bg = bgValue(a.bg, a.kind);
+        const newWorld = s.bg.kind === 'world' ? s.bg.id : null;
+        // Entering another world starts at its camera= mark (the renderer
+        // loads it that way); leaving a world for 2D drops the 3D camera, so
+        // its zoom/marks don't leak into the 2D stage. 2D -> 2D keeps it.
+        const cameraChanged = prevWorld !== newWorld;
+        if (cameraChanged) s.camera = startCamera(vm, s.bg);
         vm.emit({ type: 'stage', op: 'bg', bg: clone(s.bg), with: a.with, time: a.time != null ? a.time : 0.8 });
+        if (cameraChanged && !newWorld) vm.emit({ type: 'stage', op: 'camera', camera: clone(s.camera), orbit: 0, time: 0, ease: 'inout' });
         finishTransition(vm, a, true, 0.8);
       },
     },
@@ -151,10 +180,7 @@ export default {
           actor.attrs = { ...c.defaults, ...remembered, ...(a.attrs || {}) };
           vm.state.charAttrs[a.who] = { ...actor.attrs };
         }
-        if (a.at != null) {
-          if (a.atMark) { actor.mark = a.at; }
-          else { actor.x = a.at; actor.mark = null; const p = vm.program.decls.positions; for (const [n, v] of Object.entries(p)) if (v.x === a.at) { if (v.y != null) actor.y = v.y; if (v.scale != null) actor.scale = v.scale; } }
-        }
+        placeAt(actor, a, vm);
         if (a.y != null) actor.y = a.y;
         if (a.scale != null) actor.scale = a.scale;
         if (a.z != null) actor.z = a.z;
@@ -201,7 +227,7 @@ export default {
         const a = ins.args, s = vm.state.stage;
         const actor = s.actors.find(x => x.id === a.who);
         if (!actor) { vm.warn(`@move: \`${a.who}\` is not on stage.`, ins.loc); return; }
-        if (a.at != null) { if (a.atMark) actor.mark = a.at; else { actor.x = a.at; actor.mark = null; } }
+        placeAt(actor, a, vm);
         for (const k of ['y', 'scale', 'flip', 'z']) if (a[k] != null) actor[k] = a[k];
         vm.emit({ type: 'stage', op: 'move', id: a.who, actor: clone(actor), time: a.time, ease: a.ease });
         if (a.wait && a.time > 0) vm.halt({ type: 'wait', seconds: a.time, skippable: true, reason: 'transition' });
@@ -255,7 +281,7 @@ export default {
         if ((!bg || bg.kind !== 'world') && ['from', 'look', 'fov', 'orbit'].some(k => a[k] != null)) {
           vm.warn('`@camera from=/look=/fov=/orbit=` only work in 3D worlds; the background here is 2D, so they are ignored.', ins.loc, 'R705');
         }
-        if (a.action === 'reset') Object.assign(cam, newStage().camera);
+        if (a.action === 'reset') Object.assign(cam, startCamera(vm, vm.state.stage.bg));
         for (const k of ['zoom', 'x', 'y', 'rotate', 'from', 'look', 'fov']) if (a[k] != null) cam[k] = a[k];
         vm.emit({ type: 'stage', op: 'camera', camera: clone(cam), orbit: a.orbit || 0, time: a.time, ease: a.ease });
         if (a.wait && a.time > 0) vm.halt({ type: 'wait', seconds: a.time, skippable: true, reason: 'transition' });
@@ -311,12 +337,16 @@ export default {
       name: 'tint',
       summary: 'Wash the picture with a color, or `@tint none`.',
       syntax: '@tint <color | none> [alpha=0.3] [time=1]',
-      positional: [{ name: 'color', type: 'string', required: true, doc: 'A color like #ff8844, or none' }],
+      positional: [{ name: 'color', type: 'string', required: true, doc: 'A color (#rrggbb or a basic name like orange), or none' }],
       named: { alpha: { type: 'number', default: 0.3 }, time: { type: 'duration', default: 1 } },
       examples: ['@tint #ff6a00 alpha=0.25', '@tint none'],
       compile(cmd, ctx, args) {
         const c = args.pos.color;
-        if (c !== 'none' && !/^#|^[a-z]+$/.test(c)) ctx.diags.error('E303', `\`${c}\` is not a color.`, cmd.loc);
+        if (c !== 'none' && !isColor(c)) {
+          const hint = has(FILTERS, c) ? `\`${c}\` is a filter: write \`@filter ${c}\`.` : didYouMean(c, ['none']) ? 'Did you mean `none`?' : undefined;
+          ctx.diags.error('E303', `\`${c}\` is not a color. Use #rrggbb or a basic name like black, or \`none\`.`, cmd.loc, hint);
+          return null;
+        }
         return { op: 'cmd', name: 'tint', args: { color: c, ...args.named } };
       },
       exec(ins, vm) {

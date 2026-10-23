@@ -1,8 +1,9 @@
 // Declarations: compile-time only. They name the things a story uses.
 
 import { parseAssignment, ExprError } from '../expr.js';
-import { checkValue } from '../registry.js';
+import { checkValue, has, POSITIONS } from '../registry.js';
 import { isIdent, didYouMean } from '../util.js';
+import { assignmentErrorPos } from './story.js';
 
 const CHAR_PROPS = {
   name: 'string', color: 'color', sprite: 'path', layer: 'path', side: 'path', blink: 'path', mouth: 'path',
@@ -10,6 +11,9 @@ const CHAR_PROPS = {
   role: 'enum:protagonist|main|side|appears', gender: 'enum:female|male|nonbinary|unknown', age: 'string',
   description: 'string', cv: 'string', original_name: 'string',
 };
+// Free-text properties: a near-miss key with free text is almost surely a typo
+// (`nmae: Mio Tanaka`), never an attribute group.
+const TEXT_PROPS = ['name', 'description', 'age', 'cv', 'original_name'];
 
 function literal(ast) {
   if (!ast) return undefined;
@@ -27,7 +31,7 @@ function declareVar(persistent) {
     catch (e) {
       if (e instanceof ExprError) {
         if (/^\s*[A-Za-z_]\w*\s*$/.test(cmd.raw)) ctx.diags.error('E402', `\`@${kw} ${cmd.raw.trim()}\` needs a starting value.`, cmd.loc, `Write \`@${kw} ${cmd.raw.trim()} = 0\` (or = false, or = "").`);
-        else ctx.diags.error(e.code, e.message, { ...cmd.loc, col: cmd.rawCol + (e.pos || 0) }, e.hint);
+        else ctx.diags.error(e.code, e.message, { ...cmd.loc, col: cmd.rawCol + assignmentErrorPos(cmd.raw, e) }, e.hint);
         return;
       }
       throw e;
@@ -46,13 +50,13 @@ function templateGroups(tpl) {
 function declareCharacter(cmd, ctx, args) {
   const id = args.pos.id;
   if (!id) return;
-  const c = { id, name: null, color: null, sprite: null, layers: [], side: null, blink: null, mouth: null, model: null, scale: 1, y: 0, groups: {}, attrIndex: {}, defaults: {}, vndb: {} };
+  const c = { id, name: null, color: null, sprite: null, layers: [], side: null, blink: null, mouth: null, model: null, scale: 1, y: 0, groups: Object.create(null), attrIndex: Object.create(null), defaults: Object.create(null), vndb: {} };
   const entries = [];
   for (const a of cmd.args.slice(1)) entries.push({ key: a.key, value: a.value, loc: { ...cmd.loc, col: a.col }, positional: !a.key });
   for (const p of cmd.props) entries.push({ key: p.key, value: p.value, loc: p.loc });
   for (const e of entries) {
     if (e.positional) continue; // reported by bindArgs
-    const type = CHAR_PROPS[e.key];
+    const type = has(CHAR_PROPS, e.key) ? CHAR_PROPS[e.key] : null;
     if (e.key === 'gender') e.value = ({ f: 'female', m: 'male', nb: 'nonbinary', n: 'nonbinary', x: 'nonbinary', '?': 'unknown' })[String(e.value).toLowerCase()] || e.value;
     if (type) {
       const r = checkValue(type, e.value, ctx);
@@ -66,9 +70,17 @@ function declareCharacter(cmd, ctx, args) {
     // Anything else is an attribute group: "expression: neutral smile sad"
     const values = String(e.value).split(/[\s,]+/).filter(Boolean);
     if (!values.length) { ctx.diags.error('E303', `Attribute group \`${e.key}\` lists no values.`, e.loc); continue; }
-    if (values.length === 1 && !templateHasGroup(c, e.key, entries)) {
+    // A misspelled property must not silently become an attribute group.
+    // It is a typo when the key is close to a property, no image template
+    // uses it as {group}, and the value can't be a list of attributes: one
+    // value only, words that aren't simple names, or free text for a text
+    // property (`nmae: Mio Tanaka`, `descripton: The quiet ...`). Real groups
+    // near a property name (`pose:` vs role, `size:` vs side) stay groups.
+    if (!templateHasGroup(c, e.key, entries)) {
       const m = didYouMean(e.key, Object.keys(CHAR_PROPS));
-      if (m) { ctx.diags.error('E302', `\`@character\` has no property \`${e.key}\`.`, e.loc, `Did you mean \`${m}\`?`); continue; }
+      if (m && (values.length === 1 || TEXT_PROPS.includes(m) || values.some(v => !isIdent(v)))) {
+        ctx.diags.error('E302', `\`@character\` has no property \`${e.key}\`.`, e.loc, `Did you mean \`${m}\`?`); continue;
+      }
     }
     c.groups[e.key] = values;
     c.defaults[e.key] = values[0];
@@ -113,9 +125,21 @@ function assetDecl(kind, extraNamed) {
     named: extraNamed,
     declare(cmd, ctx, args) {
       if (!args.pos.id || !args.pos.path) return;
+      if (kind === 'world') checkWorldCamera(cmd, ctx, args.named);
       ctx.addAsset(args.pos.id, kind, args.pos.path, args.named, cmd.loc);
     },
   };
+}
+
+// `@world ... marks="..." camera=x`: the starting mark must be one of the
+// world's own marks (a world without marks= accepts any mark).
+function checkWorldCamera(cmd, ctx, named) {
+  const marks = named.marks || [];
+  const cam = named.camera;
+  if (!cam || !marks.length || marks.includes(cam)) return;
+  const m = didYouMean(cam, marks);
+  ctx.diags.error('E303', `\`camera=\`: \`${cam}\` is not one of this world's marks.`, cmd.loc,
+    m ? `Did you mean \`${m}\`?` : `Its marks are: ${marks.join(', ')}. Add \`${cam}\` to marks= if it is a new one.`);
 }
 
 export default {
@@ -207,9 +231,19 @@ export default {
       named: { x: { type: 'number', doc: '0 = left edge, 1 = right edge.' }, y: { type: 'number', default: 0 }, scale: { type: 'number', default: 1 } },
       examples: ['@position doorway x=0.82 scale=0.8'],
       declare(cmd, ctx, args) {
-        if (!args.pos.name) return;
+        const name = args.pos.name;
+        if (!name) return;
         if (args.named.x == null) { ctx.diags.error('E301', '`@position` needs x=.', cmd.loc); return; }
-        ctx.decls.positions[args.pos.name] = { x: args.named.x, y: args.named.y, scale: args.named.scale };
+        if (has(POSITIONS, name)) {
+          ctx.diags.error('E204', `\`${name}\` is a built-in position (x=${POSITIONS[name]}) and can't be redeclared.`, cmd.loc, `Pick another name, e.g. \`@position ${name}_near x=${args.named.x}\`.`);
+          return;
+        }
+        const prev = has(ctx.decls.positions, name) ? ctx.decls.positions[name] : null;
+        if (prev) {
+          ctx.diags.error('E204', `Position \`${name}\` is already declared${prev.loc ? ` (at ${prev.loc.file}:${prev.loc.line})` : ''}.`, cmd.loc, 'Each @position name is declared once; pick a different name.');
+          return;
+        }
+        ctx.decls.positions[name] = { x: args.named.x, y: args.named.y, scale: args.named.scale, loc: cmd.loc };
       },
     },
   ],
