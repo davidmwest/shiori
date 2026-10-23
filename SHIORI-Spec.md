@@ -1342,6 +1342,7 @@ Check a condition while testing. `shiori explore` reports every assertion that c
 ```shiori
 @assert trust >= 0
 @assert visited("harbor") > 0
+@assert route == "rin" "Only Rin's route reaches the roof"
 ```
 
 ### `@log`
@@ -1721,7 +1722,7 @@ Wash the picture with a color, or `@tint none`.
 
 | Argument | | Type | Meaning |
 |---|---|---|---|
-| `color` | required | string | A color like #ff8844, or none |
+| `color` | required | string | A color (#rrggbb or a basic name like orange), or none |
 | `alpha=` | default `0.3` | number |  |
 | `time=` | default `1` | duration |  |
 
@@ -2063,9 +2064,9 @@ Every message from `shiori check`, `shiori explore` and the player carries one o
 | Code | Meaning | What to do |
 |---|---|---|
 | E100 | Missing or invalid version line | game.story must begin with the line `SHIORI 1`. Other files should too. |
-| E101 | Inconsistent indentation | A line is indented less than the block it is in, but does not line up with any outer block. Indent every line of a block by the same amount (two spaces is usual). |
+| E101 | Inconsistent indentation | A line is indented less than the block it is in, but does not line up with any outer block. Indent every line of a block by the same amount (two spaces is usual). A no-break space (U+00A0) or a full-width space (U+3000) is not indentation, so one before a command, choice, jump or dialogue is also E101: replace it with ordinary spaces. |
 | E102 | Unexpected indentation | Only three things take indented lines: the body of a choice (`* ...`), the body of `@if`/`@elif`/`@else`, and the `key: value` properties of a declaration. Remove the indentation, or put the line under one of those. |
-| E103 | Content outside a scene | Every story line belongs to a scene. Start one with `# scene_id` at the very start of a line before writing narration or dialogue. |
+| E103 | Content outside a scene | Every story line belongs to a scene. Start one with `# scene_id` at the very start of a line before writing narration or dialogue. Before a file's first scene only declarations (`@character`, `@image`, `@var` ...) and `@note` may appear; move any other command below the `# scene_id` line of the scene it belongs to. |
 | E104 | Invalid scene line | A scene heading is `# id` or `# id "Title"` in column 1. Ids use letters, digits, `_` and `.`. |
 | E105 | Duplicate scene id | Two scenes share an id. Scene ids are global across all files; rename one. |
 | E106 | Invalid jump | A jump is `-> scene_id` or `-> END`. |
@@ -2075,14 +2076,14 @@ Every message from `shiori check`, `shiori explore` and the player carries one o
 | E110 | Unterminated quoted string | A quoted string in a command is missing its closing quote. |
 | E111 | Invalid command line | A command is `@name` then arguments, e.g. `@show mio smile at=left`. |
 | E112 | Invalid header line | Header fields (`title: ...`) go at the top of game.story only, after `SHIORI 1` and before the first `@` or `#` line. Check the field's value against Appendix B. |
-| E113 | Included file not found | A file listed in `include:` does not exist. Paths are relative to the folder that holds game.story. |
-| E114 | Unknown speaker | Dialogue must start with a declared character id (`mio: Hello.`), exactly as declared (ids are case-sensitive). For a one-off speaker write `"Old Man": ...`. If the line is narration that happens to contain `Word:`, start it with `\| `. |
+| E113 | Included file not found | A file the game needs is missing: the game folder does not exist, it has no game.story, or a file listed in `include:` does not exist. Check the folder name; paths in `include:` are relative to the folder that holds game.story. |
+| E114 | Unknown speaker | Dialogue must start with a declared character id (`mio: Hello.`), exactly as declared (ids are case-sensitive and use only ASCII letters, digits and `_`, so `O'Brien` needs an id like `obrien` with `name="O'Brien"`). For a one-off speaker write `"Old Man": ...`. If the line is narration that happens to contain `Word:`, start it with `\| `. |
 | E116 | Module could not be loaded | A file listed in `modules:` could not be imported, or does not `export default { name, commands: [...] }`. |
 | E200 | Unknown scene | A jump, `@call`, `start:` or `visited()` names a scene that does not exist. Check the spelling against the `# id` lines. |
 | E201 | Unknown variable | A variable is used before being declared. Add `@var name = 0` (or `= false`, `= ""`) outside any block. |
 | E202 | Unknown asset or character | A name is used that was never declared. Declare images with `@image id path`, music with `@audio id path`, characters with `@character id`. |
 | E203 | Unknown character attribute | An attribute in `mio (smile)` or `@show mio smile` is not in any of the character's attribute groups. Add it to a group (e.g. `expression: neutral smile`) or fix the spelling. |
-| E204 | Duplicate declaration | Two declarations share a name. Characters and assets share one namespace; variables have their own. |
+| E204 | Duplicate declaration | Two declarations share a name. Characters and assets share one namespace; variables, `@position` names and endings each have their own. A position can't reuse a built-in name (left, center ...). An ending has one title and one kind: a later `@ending id` may repeat them or leave them out, but not change them. |
 | E205 | Wrong kind of asset | The name exists but is the wrong kind (e.g. an audio id used as a background). |
 | E206 | Unknown function | An unknown function is used in a condition. See "Functions" in Appendix B. |
 | E207 | Unknown ending | `ending_seen("x")` names an ending that no `@ending x` creates. |
@@ -2099,7 +2100,7 @@ Every message from `shiori check`, `shiori explore` and the player carries one o
 | E403 | Type mismatch | A variable keeps the type of its starting value: a number variable cannot be given text, etc. |
 | E500 | Unknown text tag | Unknown text tag. Tags: {b} {i} {u} {s} {color=#hex} {size=1.5} {ruby=reading} {shake} {wave} {speed=0.5} {w} {w=0.5} {nw} {br} {$var}. Literal braces are {{ and }}. |
 | E501 | Unbalanced text tag | A text tag is not closed, or closed out of order. Close inner tags first: {b}{i}x{/i}{/b}. |
-| E502 | Invalid text tag value | A text tag has a bad value, e.g. {color=} without a color. |
+| E502 | Invalid text tag value | A text tag has a bad value or is in the wrong place, e.g. {color=} without a color, {size=0}, or {b} inside {ruby}. {size=…} and {speed=…} need a plain number above 0 and {w=…} a number of seconds; inside {ruby=…}…{/ruby} put only text and {$name}; {nw} goes at the end of the line. |
 | W600 | Unreachable scene | No jump, choice or fall-through leads to this scene, so players can never see it. |
 | W601 | Unused declaration | Declared but never used. Remove it, or use it. |
 | W602 | Missing asset file | A declared file does not exist yet. Normal while art and music are being made; `shiori assets` shows where each is used. |
@@ -2114,20 +2115,23 @@ Every message from `shiori check`, `shiori explore` and the player carries one o
 | W611 | Ending never reached | `shiori explore` found no route that reaches this ending. |
 | W612 | Variable is never read | The variable is set but never read, so it cannot change the story. |
 | W613 | Choice text is empty | A choice with no text. |
-| W614 | Long run of dialogue without narration | 30+ lines of dialogue in a row with no narration. Add narration: gestures, setting, thoughts. |
+| W614 | Long run of dialogue without narration | 30+ lines of dialogue in a row with no narration. Counted along the story's flow: different choices and `@if` branches are counted separately, and a run continues through jumps and fall-through. Add narration: gestures, setting, thoughts. |
 | W615 | Block terminator not used in Shiori | `@end`, `@endif` etc. are not used in Shiori: blocks end where their indentation ends. Delete the line. |
-| W616 | Long stretch with no visual change | 30+ ADV lines with no visual change. These reset the count: @scene @bg @show @hide @move @cg @camera @weather @filter @tint @shake @flash @video @mode, a menu, or a dialogue line whose attributes change the expression. NVL lines are not counted. |
-| W617 | Music (LMN) warning | A warning from the LMN music compiler. See engine/vendor/lmn/LMN-Spec.md. |
+| W616 | Long stretch with no visual change | 30+ ADV lines with no visual change, counted along the story's flow (choices and `@if` branches separately, through jumps and fall-through). These reset the count: @scene @bg @show @hide @move @cg @camera @weather @filter @tint @shake @flash @video @mode, a menu, or a dialogue line whose attributes change the expression. NVL lines are not counted. |
+| W617 | Music (LMN) warning | A warning or note about a song: from the LMN music compiler, or a .txt song whose first line is not `LMN 1` (add that line, or rename the file to .lmn). LMN notes are shown as info and don't fail `--strict`. See engine/vendor/lmn/LMN-Spec.md. |
 | W618 | Camera looks at itself | `@camera from=` and `look=` name the same mark, so the camera would look at itself. |
 | W619 | Line too long for the textbox | An ADV line over ~280 characters overflows a three-line textbox. Split it, or use `@mode nvl`. |
 | W620 | Ending followed by more story | An `@ending` is followed by a jump back into the story. The ending is recorded and its card shown, then play continues. Add `-> END` if the game should stop there. |
 | W621 | Every option in a menu is conditional | Every option in this menu is conditional. If none is available, the menu is skipped (R704). Add an unconditional option. |
+| W622 | Code after a jump never runs | These lines can never run: they come after a `->`, `@jump` or `@return` in the same block, or after a menu or `@if`/`@else` whose every path jumps away. Also reported: a choice's `-> target` when the lines under it always jump first, and an `@elif` that repeats an earlier condition. Move the lines above the jump (an `@ending` goes before `-> END`) or delete them. Declarations and `@note` may stand anywhere. |
+| W623 | Comparison with a true/false value | `<`, `<=`, `>` or `>=` has a true/false value on one side. `(1 < x) < 5` compares `1 < x` (true or false) with 5, so it is true for every x above 1. Write a range as `1 < x and x < 5`, and test a true/false value directly (`@if met_rin`, `not met_rin`) or with `==`. |
 | R700 | Runtime error | A problem while the story ran (e.g. division by zero). |
 | R701 | Assertion failed | An `@assert` condition was false on this route. |
 | R702 | Return without call | `@return` was reached without an `@call`. Scenes reached by a jump should end with a jump, not `@return`. |
 | R703 | Infinite loop | The story ran a long time without stopping for the player: a loop of jumps with no text or choice. |
 | R704 | Menu with no available options | A menu had no available options and was skipped. |
 | R705 | 3D camera arguments over a 2D background | `from=`, `look=`, `fov=` and `orbit=` only apply in 3D worlds. |
+| R706 | Unlock exploration was capped | `shiori explore` replays the story from every different set of endings seen and `@persistent` values a playthrough can end in, but it stops after 16 playthroughs in a row or 64 such sets. Endings, lines and choices that need more playthroughs are then listed as not reached, though players may still reach them. |
 | V800 | VNDB eligibility problem |  |
 | V801 | VNDB eligibility warning |  |
 

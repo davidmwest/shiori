@@ -1,2 +1,5 @@
 // Test suites run by tests/run.js (bin/shiori selftest).
-export const SUITES = ['suite-core.js', 'suite-parser.js', 'suite-compiler.js', 'suite-expr-markup-ui.js', 'suite-vm.js', 'suite-analysis.js', 'suite-cli.js'];
+export const SUITES = [
+  'suite-core.js', 'suite-parser.js', 'suite-compiler.js', 'suite-expr-markup-ui.js', 'suite-vm.js', 'suite-analysis.js', 'suite-cli.js',
+  'suite-followup-compiler.js', 'suite-followup-parser-runtime.js', 'suite-followup-vm.js', 'suite-followup-explore-cli.js',
+];
