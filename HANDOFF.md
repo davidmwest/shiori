@@ -5,7 +5,7 @@ Where the Shiori work stands and what comes next, kept current so the next sessi
 - **Repo:** https://github.com/davidmwest/shiori
 - **Branch:** `claude/dazzling-meitner-uz8dhg` (the only branch besides `codex/*` worker branches; keep pushing here unless the author decides otherwise)
 - **Lead:** moving back to the Mac session "Next-gen visual novel engine", which works in the author's scratch folder `~/Library/Application Support/Claude/scratch-workspaces/bfe0a93b-8513-4de4-a831-49e6ac6b1779/8eb761fc-1b6b-4740-997c-246389b367e0/scratch-2026-10-22-6d653f`. The cloud session "Next-gen visual novel engine continuation" ran from 06:20 to about 08:00 UTC on Oct 23 and is winding down.
-- **Last updated:** 2026-10-23 07:30 UTC
+- **Last updated:** 2026-10-23 07:40 UTC
 
 ## 1. Syncing the Mac folder
 
@@ -83,8 +83,9 @@ for i in 1 2 3 4 5; do git worktree remove --force .claude/worktrees/wf_ede3a973
   - **Astra** writes what players see: dialogue and songs.
 - **Launcher:** `tools/codex-worker.sh` runs one worker in its own worktree under `~/Documents/Codex/shiori-workers/<task>` and pushes the result to `codex/<task>`. Codex itself runs sandboxed (workspace-write, no network); only the launcher pushes. Review a worker's branch before merging anything from it. The script header explains its files.
 - **Started by the cloud session** through a launch session on the Mac ("Shiori: launch Codex workers"), once the author approves its commands:
-  - `story-audit` (Sol, highest reasoning). It produces `reviews/story-audit.md` on `codex/story-audit`: the promise ledger per route, continuity, character voices, AI tells, content rating, and the top ten fixes. Review the findings, then fix what holds up. Hand the dialogue and joke rewrites to Astra.
-  - `art-stage1` puts the raw PNGs on `codex/art-stage1` under `examples/terrible-things/source/codex/stage1/out/`.
+  - `story-audit` (gpt-6.1-sol, effort ultra; running since 07:26 UTC). It produces `reviews/story-audit.md` on `codex/story-audit`: the promise ledger per route, continuity, character voices, AI tells, content rating, and the top ten fixes. Review the findings, then fix what holds up. Hand the dialogue and joke rewrites to Astra.
+  - `art-stage1`: finished, with all 9 raw PNGs on `codex/art-stage1` under `examples/terrible-things/source/codex/stage1/out/`.
+- **Models on the Mac** (all support low, medium, high, xhigh, max and ultra): gpt-6.1-sol, gpt-6-astra, gpt-6-sol, gpt-5.6-sol.
 - **Good next workers:**
   - a Sol code review of the round-4 merge (a second model's eyes) once it lands;
   - a Sol run of selftest and every game under Apple's JavaScriptCore, plus a Safari/WebKit check of the player and showcase.
@@ -116,7 +117,7 @@ for i in 1 2 3 4 5; do git worktree remove --force .claude/worktrees/wf_ede3a973
 ## 5. Waiting on the author
 
 - `examples/terrible-things/VOICE.md`: use as is, or changes?
-- Stage-1 art: pick the bases (Nagi a/b, Nemu a/b) or ask for redraws.
+- Stage-1 art: done (9 images on `codex/art-stage1`, under `examples/terrible-things/source/codex/stage1/out/`). The cloud session's picks, which the author may override: **Nagi `nagi_neutral_a`** (head straight, cleanest for face overlays) and **Nemu `nemu_sleepy_a`** (the two takes are nearly identical). All five backgrounds are accepted as they are; they match their briefs and the bakery's style. Next: copy the picks plus Suzu and Hinata into `source/codex/bases/`, clean the alpha, and build stage 2. Don't merge the branch's stray `.codex-last-message.md`.
 - Later decisions:
   - the promise ledger feature (`@promise` / `@payoff`, checked by the explorer on every route);
   - the first release (this game on itch.io, or 2 or 3 new pitches);
