@@ -19,6 +19,12 @@ export const TAGS = {
   br:    { paired: false, value: 'none',     doc: 'Line break inside one line of text.' },
 };
 
+const NUMBER_HINT = {
+  w: 'Write `{w=0.5}` to pause for half a second, or `{w}` to wait for a click.',
+  size: '1 is normal size: `{size=1.5}…{/size}` is half again as big, `{size=0.8}…{/size}` smaller.',
+  speed: '1 is normal speed: `{speed=0.5}…{/speed}` types at half speed, `{speed=2}…{/speed}` twice as fast.',
+};
+
 // Returns { tokens, errors } — never throws.
 export function parseMarkup(text) {
   const tokens = [];
@@ -84,18 +90,31 @@ export function parseMarkup(text) {
       continue;
     }
     let v = null;
+    const numeric = def.value === 'number' || def.value === 'optional-number';
+    const errorCount = errors.length;
     if (def.value === 'none' && value != null) {
       errors.push({ code: 'E502', message: `\`{${name}}\` takes no value.`, col });
     } else if (def.value === 'required' && !value) {
       errors.push({ code: 'E502', message: `\`{${name}=...}\` needs a value.`, col });
     } else if (def.value === 'color' && (!value || !isColor(value))) {
       errors.push({ code: 'E502', message: `\`{color=${value || ''}}\` needs a color like #ff6688.`, col });
-    } else if ((def.value === 'number' || def.value === 'optional-number') && value != null && !(isFinite(Number(value)) && Number(value) >= 0)) {
-      errors.push({ code: 'E502', message: `\`{${name}=${value}}\` needs a number.`, col });
+    } else if (numeric && value === '') {
+      errors.push({ code: 'E502', message: `\`{${name}=}\` is missing its number.`, col, hint: NUMBER_HINT[name] });
+    } else if (numeric && value != null && !/^(\d+\.?\d*|\.\d+)$/.test(value)) {
+      errors.push({ code: 'E502', message: `\`{${name}=${value}}\` needs a plain number like 0.5.`, col, hint: NUMBER_HINT[name] });
     } else if (def.value === 'number' && value == null) {
-      errors.push({ code: 'E502', message: `\`{${name}=...}\` needs a number.`, col });
+      errors.push({ code: 'E502', message: `\`{${name}=...}\` needs a number.`, col, hint: NUMBER_HINT[name] });
+    } else if (def.value === 'number' && !(Number(value) > 0)) {
+      errors.push({ code: 'E502', message: `\`{${name}=${value}}\` needs a number above 0.`, col, hint: NUMBER_HINT[name] });
     } else {
-      v = (def.value === 'number' || def.value === 'optional-number') && value != null ? Number(value) : value;
+      v = numeric && value != null ? Number(value) : value;
+    }
+    // A ruby is drawn as one piece with one style, so its base may hold only
+    // text and {$var}.
+    if (stack.includes('ruby') && errors.length === errorCount) {
+      if (name === 'ruby') errors.push({ code: 'E502', message: 'A `{ruby}` cannot go inside another `{ruby}`.', col, hint: 'Close the first one with `{/ruby}` before the next `{ruby=...}`.' });
+      else if (def.paired) errors.push({ code: 'E502', message: `\`{${name}}\` cannot go inside \`{ruby}…{/ruby}\`.`, col, hint: `Put it around the whole ruby: \`{${name}${value != null ? '=' + value : ''}}{ruby=...}…{/ruby}{/${name}}\`.` });
+      else errors.push({ code: 'E502', message: `\`{${name}${value != null ? '=' + value : ''}}\` cannot go inside \`{ruby}…{/ruby}\`.`, col, hint: 'Put it before `{ruby=...}` or after `{/ruby}`.' });
     }
     flush();
     if (name === 'w') tokens.push({ t: 'wait', seconds: v });
@@ -107,7 +126,7 @@ export function parseMarkup(text) {
   for (const open of stack) errors.push({ code: 'E501', message: `\`{${open}}\` is never closed.`, col: text.length, hint: `Add \`{/${open}}\`.` });
   // {nw} must be last
   const nwIndex = tokens.findIndex(t => t.t === 'nw');
-  if (nwIndex >= 0 && tokens.slice(nwIndex + 1).some(t => t.t === 'text' && t.s.trim())) {
+  if (nwIndex >= 0 && tokens.slice(nwIndex + 1).some(t => (t.t === 'text' && t.s.trim()) || t.t === 'var')) {
     errors.push({ code: 'E502', message: '`{nw}` must come at the end of the line.', col: text.length });
   }
   return { tokens, errors };
@@ -127,9 +146,12 @@ export function plainText(tokens, getVar) {
 // Styled runs for renderers.
 // Each run: { text, style: {b,i,u,s,color,size,shake,wave,speed}, ruby } or
 // { wait: seconds } / { click: true } / { br: true }.
+// A closing tag restores the value its opening tag replaced, so nested tags of
+// the same kind work: {color=#f00}a{color=#fff}b{/color}c{/color} -> c is red.
 export function toRuns(tokens, getVar) {
   const runs = [];
   const style = {};
+  const saved = [];  // [tag, value before it was opened], innermost last
   let ruby = null, rubyText = '';
   const pushText = (text) => {
     if (!text) return;
@@ -142,11 +164,19 @@ export function toRuns(tokens, getVar) {
     else if (t.t === 'br') runs.push({ br: true });
     else if (t.t === 'wait') runs.push(t.seconds == null ? { click: true } : { wait: t.seconds });
     else if (t.t === 'open') {
-      if (t.tag === 'ruby') { ruby = t.value; rubyText = ''; }
-      else style[t.tag] = t.value == null ? true : t.value;
+      // A nested {ruby} is E502; keep the outer one so no base text is lost.
+      if (t.tag === 'ruby') { if (ruby == null) { ruby = t.value; rubyText = ''; } }
+      else { saved.push([t.tag, style[t.tag]]); style[t.tag] = t.value == null ? true : t.value; }
     } else if (t.t === 'close') {
-      if (t.tag === 'ruby') { runs.push({ text: rubyText, ruby, style: { ...style } }); ruby = null; }
-      else delete style[t.tag];
+      if (t.tag === 'ruby') {
+        if (ruby != null) runs.push({ text: rubyText, ruby, style: { ...style } });
+        ruby = null; rubyText = '';
+      } else {
+        let k = saved.length - 1;
+        while (k >= 0 && saved[k][0] !== t.tag) k--;
+        const prev = k >= 0 ? saved.splice(k, 1)[0][1] : undefined;
+        if (prev === undefined) delete style[t.tag]; else style[t.tag] = prev;
+      }
     }
   }
   return runs;
