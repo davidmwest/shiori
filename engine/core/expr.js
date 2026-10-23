@@ -28,6 +28,15 @@ export class ExprError extends Error {
 
 const OPS = ['==', '!=', '<=', '>=', '&&', '||', '+=', '-=', '*=', '/=', '<', '>', '+', '-', '*', '/', '%', '(', ')', ',', '!', '='];
 
+// Inside quotes a backslash escapes only \\, \" and \'. Anything else (\n, \t,
+// a \u code) is an error: dropping the backslash would silently change the text.
+const ESCAPES = ['\\', '"', "'"];
+function escapeHint(e) {
+  if (e === 'n' || e === 'r') return 'A string cannot hold a line break. Put `{br}` in the text line instead, e.g. `{$first}{br}{$second}`.';
+  if (e === 'u' || e === 'x') return 'Type the character itself, e.g. `—` rather than `\\u2014`.';
+  return 'Only `\\"`, `\\\'` and `\\\\` are escapes. Write `\\\\` for a backslash.';
+}
+
 export function tokenize(src) {
   const toks = [];
   let i = 0;
@@ -43,7 +52,11 @@ export function tokenize(src) {
     if (c === '"' || c === "'") {
       let j = i + 1, s = '';
       while (j < src.length && src[j] !== c) {
-        if (src[j] === '\\' && j + 1 < src.length) { s += src[j + 1]; j += 2; } else s += src[j++];
+        if (src[j] === '\\' && j + 1 < src.length) {
+          const e = src[j + 1];
+          if (!ESCAPES.includes(e)) throw new ExprError('E400', `Unknown escape \`\\${e}\` in a string.`, j, escapeHint(e));
+          s += e; j += 2;
+        } else s += src[j++];
       }
       if (j >= src.length) throw new ExprError('E400', 'Unterminated string in expression.', i, `Close the string with ${c}.`);
       toks.push({ t: 'str', v: s, pos: i });
@@ -108,13 +121,14 @@ export function parseExpr(src) {
       if (!(close.t === 'op' && close.v === ')')) throw new ExprError('E400', 'Expected `)`.', close.pos);
       return e;
     }
-    if (t.t === 'op' && (t.v === '!' )) return { t: 'un', op: '!', a: expr(3) };
+    if (t.t === 'op' && (t.v === '!' )) return { t: 'un', op: '!', a: expr(3, t.word || '!') };
     if (t.t === 'op' && t.v === '-') return { t: 'un', op: '-', a: expr(7) };
     if (t.t === 'eof') throw new ExprError('E400', 'Expression ends too early.', t.pos);
     throw new ExprError('E400', `Unexpected \`${t.v}\` in expression.`, t.pos);
   }
 
-  function expr(minPrec) {
+  // negated: this is the operand of `not` / `!` (kept in the chained-comparison hint).
+  function expr(minPrec, negated) {
     let left = primary();
     for (;;) {
       const t = peek();
@@ -125,8 +139,22 @@ export function parseExpr(src) {
       next();
       const right = expr(prec + 1);
       left = { t: 'bin', op: t.v, a: left, b: right };
+      // The grammar allows one comparison here: `1 < x < 5` would mean
+      // `(1 < x) < 5`, which is true for every x > 1.
+      if (prec === 4 && peek().t === 'op' && BIN[peek().v] === 4) chained(left, negated);
     }
     return left;
+  }
+
+  function chained(first, negated) {
+    const t = next();
+    let hint = 'Write `1 < x and x < 5`.';
+    try {
+      const mid = exprToString(first.b);
+      const both = `${exprToString(first.a)} ${first.op} ${mid} and ${mid} ${t.v} ${exprToString(expr(5))}`;
+      hint = `Write \`${negated ? `${negated === '!' ? '!' : 'not '}(${both})` : both}\`.`;
+    } catch (e) { if (!(e instanceof ExprError)) throw e; }
+    throw new ExprError('E400', "Comparisons can't be chained.", t.pos, hint);
   }
 
   const ast = expr(0);
@@ -138,19 +166,27 @@ export function parseExpr(src) {
   return ast;
 }
 
-// Assignment statement used by @set: "name = expr", "name += expr", etc.
+// Assignment statement used by @set and @var: "name = expr", "name += expr", etc.
+// Error positions are offsets into `src`.
 export function parseAssignment(src) {
-  const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(\+=|-=|\*=|\/=|=)\s*(.*)$/.exec(src);
+  const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(\+=|-=|\*=|\/=|=(?!=))\s*(.*)$/.exec(src);
   if (!m) {
     if (/^\s*[A-Za-z_][A-Za-z0-9_]*\s*(\+\+|--)\s*$/.test(src)) {
       throw new ExprError('E402', '`++` and `--` are not supported.', 0, 'Write `@set name += 1`.');
     }
-    if (/==/.test(src)) throw new ExprError('E402', '`@set` assigns with `=`, not `==`.', 0, 'Example: `@set trust = 2` or `@set trust += 1`.');
+    const eq = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*===?\s*(.*)$/.exec(src);
+    if (eq) throw new ExprError('E402', '`==` compares; an assignment uses a single `=`.', src.indexOf('=='), `Write \`${eq[1]} = ${eq[2].trim() || '…'}\`.`);
     throw new ExprError('E402', 'Expected `name = value` (or +=, -=, *=, /=).', 0, 'Example: `@set trust += 1`.');
   }
   if (!m[3].trim()) throw new ExprError('E402', `Missing value after \`${m[2]}\`.`, m[0].length);
-  const value = parseExpr(m[3]);
-  return { name: m[1], op: m[2], value, valueOffset: src.indexOf(m[3]) };
+  const valueOffset = m[0].length - m[3].length;
+  let value;
+  try { value = parseExpr(m[3]); }
+  catch (e) {
+    if (e instanceof ExprError && e.pos != null) e.pos += valueOffset;
+    throw e;
+  }
+  return { name: m[1], op: m[2], value, valueOffset };
 }
 
 export function collectRefs(ast, out = { vars: [], calls: [] }) {

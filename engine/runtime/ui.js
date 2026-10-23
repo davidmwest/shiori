@@ -25,6 +25,54 @@ function styleSpan(span, style, index) {
   if (style.wave) { span.classList.add('sh-wave'); span.style.animationDelay = (index * 0.07) + 's'; }
 }
 
+// Builds the DOM for styled runs (markup.js toRuns) inside `container`: <ruby>
+// for {ruby}, <br> for {br}, styled spans for text. Every place that shows runs
+// uses this, so they all render markup the same way.
+//   letters (default): one `sh-ch` element per letter, hidden until it gets the
+//     class `on` (the typewriter reveals them); `shown` makes them visible at once.
+//   letters: false: one visible span per run (choice buttons).
+// `per` is seconds per letter. Returns { units, total }: units are { node, at }
+// (reveal time in seconds) and { click: true, at } for each {w}.
+function renderRuns(container, runs, { quotes = null, per = 0, letters = true, shown = false } = {}) {
+  const units = [];
+  const cls = letters ? (shown ? 'sh-ch on' : 'sh-ch') : null;
+  let t = 0, idx = 0;
+  const add = (node, style) => {
+    if (cls) node.className = cls;
+    styleSpan(node, style || {}, idx++);
+    container.appendChild(node);
+    units.push({ node, at: t });
+  };
+  const addText = (text, style) => {
+    if (!text) return;
+    if (!letters) { const s = document.createElement('span'); s.textContent = text; add(s, style); return; }
+    for (const g of graphemes(text)) {
+      const s = document.createElement('span');
+      s.textContent = g;
+      add(s, style);
+      const mult = style && style.speed ? style.speed : 1;
+      t += per / mult * (/[.!?。！？…]/.test(g) ? 4 : /[,、;:—]/.test(g) ? 2 : 1);
+    }
+  };
+  if (quotes) addText(quotes[0], {});
+  for (const r of runs) {
+    if (r.br) { container.appendChild(document.createElement('br')); continue; }
+    if (r.wait != null) { t += r.wait; continue; }
+    if (r.click) { units.push({ click: true, at: t }); continue; }
+    if (r.ruby != null) {
+      const rb = document.createElement('ruby');
+      rb.appendChild(document.createTextNode(r.text));
+      const rt = document.createElement('rt'); rt.textContent = r.ruby; rb.appendChild(rt);
+      add(rb, r.style);
+      t += per * Math.max(1, graphemes(r.text).length);
+      continue;
+    }
+    addText(r.text, r.style);
+  }
+  if (quotes) addText(quotes[1] || quotes[0], {});
+  return { units, total: t };
+}
+
 // Reveals styled runs letter by letter. Supports {w=s} pauses and {w} click-waits.
 export class Typewriter {
   constructor(container) {
@@ -35,49 +83,19 @@ export class Typewriter {
   start(runs, { cps = 45, quotes = null, onDone, onClickWait } = {}) {
     this.stop();
     this.el.textContent = '';
-    this.units = [];  // { node, at } or { click: true } markers
     this.onDone = onDone; this.onClickWait = onClickWait;
-    let t = 0, idx = 0;
     const per = cps > 0 ? 1 / cps : 0;
-    const addText = (text, style) => {
-      for (const g of graphemes(text)) {
-        const s = document.createElement('span');
-        s.className = 'sh-ch';
-        s.textContent = g;
-        styleSpan(s, style || {}, idx++);
-        this.el.appendChild(s);
-        this.units.push({ node: s, at: t });
-        const mult = style && style.speed ? style.speed : 1;
-        t += per / mult * (/[.!?。！？…]/.test(g) ? 4 : /[,、;:—]/.test(g) ? 2 : 1);
-      }
-    };
-    if (quotes) addText(quotes[0], {});
-    for (const r of runs) {
-      if (r.br) { const br = document.createElement('br'); this.el.appendChild(br); continue; }
-      if (r.wait != null) { t += r.wait; continue; }
-      if (r.click) { this.units.push({ click: true, at: t }); continue; }
-      if (r.ruby != null) {
-        const rb = document.createElement('ruby');
-        rb.className = 'sh-ch';
-        rb.appendChild(document.createTextNode(r.text));
-        const rt = document.createElement('rt'); rt.textContent = r.ruby; rb.appendChild(rt);
-        styleSpan(rb, r.style || {}, idx++);
-        this.el.appendChild(rb);
-        this.units.push({ node: rb, at: t });
-        t += per * Math.max(1, graphemes(r.text).length);
-        continue;
-      }
-      addText(r.text, r.style);
-    }
-    if (quotes) addText(quotes[1] || quotes[0], {});
-    this.total = t;
+    const { units, total } = renderRuns(this.el, runs, { quotes, per });
+    this.units = units;  // { node, at } or { click: true } markers
+    this.total = total;
     this.pos = 0;            // index of next unit to reveal
     this.clock = 0;          // seconds since the current segment began
     this.offset = 0;         // 'at' time where the current segment began
     this.waitingClick = false;
     this.finished = false;
     this.last = performance.now();
-    if (per === 0) { this.revealUntilClick(); return; }
+    this.instant = per === 0;
+    if (this.instant) { this.revealUntilClick(); return; }
     const tick = (now) => {
       const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
@@ -116,7 +134,11 @@ export class Typewriter {
   // A click at a {w}: continue typing. Returns true if the click was used.
   click() {
     if (this.finished) return false;
-    if (this.waitingClick) { this.waitingClick = false; this.last = performance.now(); return true; }
+    if (this.waitingClick) {
+      this.waitingClick = false; this.last = performance.now();
+      if (this.instant) this.revealUntilClick();  // no ticking: show the next segment now
+      return true;
+    }
     this.revealUntilClick();
     return true;
   }
@@ -188,10 +210,11 @@ export class TextUI {
     if (e.op === 'textbox') this.showBox(e.visible);
   }
 
+  // Restore (load, rollback, rollforward): rebuild the NVL page with its text shown.
   sync(text) {
     this.setMode(text.mode || 'adv');
     this.clearNvl();
-    if (text.mode === 'nvl') for (const p of text.page || []) this.addNvlParagraph(p, true);
+    if (text.mode === 'nvl') for (const p of text.page || []) this.appendNvl(p, true);
   }
 
   clearNvl() {
@@ -199,14 +222,29 @@ export class TextUI {
     this.nvlPage.textContent = '';
   }
 
+  // One NVL paragraph: the speaker's name, then the text. instant: the text is
+  // shown at once (a restored page); otherwise its letters are laid out hidden,
+  // ready for the typewriter, so the page can be measured.
   addNvlParagraph(entry, instant) {
     const p = el('p', 'sh-nvl-p' + (entry.who || entry.name ? ' sh-nvl-dialogue' : ''), this.nvlPage);
+    if (entry.pov && !entry.name) { p.classList.add('sh-nvl-pov'); p.style.setProperty('--pov', entry.pov.color || '#aab'); }
     if (entry.name) {
       const n = el('span', 'sh-nvl-name', p, entry.name);
       if (entry.color) n.style.color = entry.color;
     }
     const body = el('span', 'sh-nvl-text', p);
+    renderRuns(body, entry.runs || [], { quotes: entry.name && this.quotes ? this.quotes : null, shown: !!instant });
     return { p, body };
+  }
+
+  // Adds a paragraph, first turning the page when it would not fit.
+  appendNvl(entry, instant) {
+    let r = this.addNvlParagraph(entry, instant);
+    if (this.nvlPage.scrollHeight > this.nvlPage.clientHeight + 2 && this.nvlPage.children.length > 1) {
+      this.clearNvl();
+      r = this.addNvlParagraph(entry, instant);
+    }
+    return r;
   }
 
   // Show a line. Calls onDone when fully revealed; onClickWait at {w}.
@@ -219,17 +257,7 @@ export class TextUI {
     this.showBox(true);
     if (h.mode === 'nvl') {
       this.setMode('nvl');
-      // Turn the page when it is full.
-      const tryAdd = () => {
-        const { p, body } = this.addNvlParagraph(h);
-        return { p, body };
-      };
-      let { p, body } = tryAdd();
-      if (this.nvlPage.scrollHeight > this.nvlPage.clientHeight + 2 && this.nvlPage.children.length > 1) {
-        this.clearNvl();
-        ({ p, body } = tryAdd());
-      }
-      if (h.pov && !h.name) { p.classList.add('sh-nvl-pov'); p.style.setProperty('--pov', h.pov.color || '#aab'); }
+      const { p, body } = this.appendNvl(h);  // turns the page when it is full
       this.nvlTyper = new Typewriter(body);
       this.nvlCtc = el('span', 'sh-ctc sh-nvl-ctc', p, '▼');
       this.nvlTyper.start(h.runs, { cps, quotes, onDone: () => { this.nvlCtc.classList.add('on'); onDone && onDone(); }, onClickWait: () => { this.nvlCtc.classList.add('on'); onClickWait && onClickWait(); } });
@@ -281,9 +309,7 @@ export class TextUI {
       const num = el('span', 'sh-choice-n', b, String(i + 1));
       num.setAttribute('aria-hidden', 'true');
       const label = el('span', 'sh-choice-t', b);
-      for (const r of o.runs) {
-        if (r.text) { const s = el('span', null, label, r.text); if (r.style) styleSpan(s, r.style, 0); }
-      }
+      renderRuns(label, o.runs, { letters: false });
       if (o.disabled) { b.disabled = true; b.title = o.hint || 'Locked'; el('span', 'sh-lock', b, '🔒'); if (o.hint) el('span', 'sh-choice-hint', label, o.hint); }
       b.addEventListener('click', (ev) => { ev.stopPropagation(); if (!o.disabled) { this.choices.classList.remove('on'); onChoose(o.index); } });
       buttons.push({ b, o });
