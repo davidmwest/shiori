@@ -54,7 +54,7 @@ html, body { margin: 0; height: 100%; background: #05060c; color: var(--sh-text)
   position: absolute; left: 196px; bottom: 256px; padding: 6px 20px; border-radius: 999px; font-size: 22px; font-style: italic; letter-spacing: 0.08em;
   color: var(--pov); background: rgba(10, 12, 28, 0.82); border: 1px solid var(--pov); opacity: 0; transition: opacity .2s;
 }
-.sh-pov::before { content: "◇ "; }
+.sh-pov::before, .sh-nvl-povname::before { content: "◇ "; content: "◇ " / ""; }
 .sh-pov.on { opacity: 0.95; }
 .sh-side { position: absolute; left: 70px; bottom: 34px; height: 400px; opacity: 0; transition: opacity .2s; filter: drop-shadow(0 8px 20px rgba(0,0,0,.5)); }
 .sh-side.on { opacity: 1; }
@@ -78,6 +78,7 @@ html, body { margin: 0; height: 100%; background: #05060c; color: var(--sh-text)
 .sh-nvl-name { font-weight: 700; margin-right: 0.6em; }
 .sh-nvl-name::after { content: ""; }
 .sh-nvl-pov { border-left: 4px solid var(--pov); padding-left: 0.8em; }
+.sh-nvl-povname { display: block; font-size: 0.65em; font-style: italic; letter-spacing: 0.08em; line-height: 1.5; color: var(--pov); }
 .sh-nvl .sh-qm { right: 230px; bottom: 60px; }
 .sh-nvl-ctc { }
 

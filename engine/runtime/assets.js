@@ -12,6 +12,16 @@ export const own = (table, key) => has(table, key) ? table[key] : undefined;
 // A character's attribute values: no prototype, so `{group}` placeholders
 // only ever match the character's own groups.
 export const attrsOf = (c, attrs) => Object.assign(Object.create(null), c.defaults, attrs);
+// Whether the blink overlay is drawn for this look: the character has `blink:`
+// and none of its current attribute values is listed in `noblink:` (art whose
+// eyes are already closed).
+export function blinks(c, attrs) {
+  if (!c || !c.blink) return false;
+  const off = c.noblink;
+  if (!off || !off.length) return true;
+  const a = attrsOf(c, attrs);
+  return !Object.keys(a).some(g => off.includes(a[g]));
+}
 
 export class Assets {
   constructor(resolveUrl, program) {
@@ -70,7 +80,7 @@ export class Assets {
 
   async loadCharacter(c, attrs) {
     const paths = this.layerPaths(c, attrs);
-    const extra = ['blink', 'mouth', 'side'].map(k => this.overlayPath(c, k, attrs)).filter(Boolean);
+    const extra = ['blink', 'mouth', 'side'].filter(k => k !== 'blink' || blinks(c, attrs)).map(k => this.overlayPath(c, k, attrs)).filter(Boolean);
     await Promise.all(paths.concat(extra).map(p => this.load(p)));
   }
 

@@ -695,12 +695,24 @@ export class VM {
       st.vars = vars;
       st.stage.actors = (st.stage.actors || []).filter(a => has(decls.characters, a.id) || has(decls.assets, a.id));
       // Attribute values the character no longer declares go back to the group's default.
+      // A value still in its own group is kept. A value that now belongs to another
+      // group moves there only when that group kept no saved value of its own and no
+      // other moved value claims it; otherwise it is dropped. Key order never matters.
       const fix = (id, attrs) => {
         const c = decls.characters[id], out = { ...c.defaults };
-        for (const [g, v] of Object.entries(attrs || {})) {
-          const group = has(c.groups, g) && c.groups[g].includes(v) ? g : has(c.attrIndex, v) ? c.attrIndex[v] : null;
-          if (group) out[group] = v;
+        const valid = (g, v) => has(c.groups, g) && c.groups[g].includes(v);
+        const entries = Object.entries(attrs || {});
+        const kept = new Set();
+        for (const [g, v] of entries) if (valid(g, v)) { out[g] = v; kept.add(g); }
+        const moved = new Map();
+        for (const [g, v] of entries) {
+          if (valid(g, v) || !has(c.attrIndex, v)) continue;
+          const to = c.attrIndex[v];
+          if (kept.has(to)) continue;
+          if (!moved.has(to)) moved.set(to, new Set());
+          moved.get(to).add(v);
         }
+        for (const [to, vs] of moved) if (vs.size === 1) out[to] = [...vs][0];
         return out;
       };
       const charAttrs = Object.create(null);

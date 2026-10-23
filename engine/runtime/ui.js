@@ -156,6 +156,9 @@ export class Typewriter {
   get waiting() { return this.waitingClick; }
 }
 
+// Narration under @pov: who and the name shown, so a @rename starts a new run.
+const povKey = (entry) => entry.pov && !entry.name ? (entry.pov.who || '') + '\u0000' + (entry.pov.name || '') : null;
+
 export class TextUI {
   constructor(root, player) {
     this.root = root;
@@ -177,6 +180,7 @@ export class TextUI {
     this.nvl = el('div', 'sh-nvl', root);
     this.nvlPage = el('div', 'sh-nvl-page', this.nvl);
     this.nvlTyper = null;
+    this.nvlPov = null;      // POV run of the page's last paragraph
 
     this.choices = el('div', 'sh-choices', root);
     this.card = el('div', 'sh-card', root);
@@ -220,21 +224,31 @@ export class TextUI {
   clearNvl() {
     if (this.nvlTyper) this.nvlTyper.stop();
     this.nvlPage.textContent = '';
+    this.nvlPov = null;
   }
 
   // One NVL paragraph: the speaker's name, then the text. instant: the text is
   // shown at once (a restored page); otherwise its letters are laid out hidden,
   // ready for the typewriter, so the page can be measured.
+  // Narration under @pov gets a bar in the POV character's colour. The first
+  // paragraph of each run of narration under the same POV (and shown name) on
+  // a page also shows that name, so colour is never the only cue.
   addNvlParagraph(entry, instant) {
     const p = el('p', 'sh-nvl-p' + (entry.who || entry.name ? ' sh-nvl-dialogue' : ''), this.nvlPage);
-    if (entry.pov && !entry.name) { p.classList.add('sh-nvl-pov'); p.style.setProperty('--pov', entry.pov.color || '#aab'); }
+    const pov = povKey(entry);
+    let povName = null;
+    if (pov) {
+      p.classList.add('sh-nvl-pov'); p.style.setProperty('--pov', entry.pov.color || '#aab');
+      if (pov !== this.nvlPov) { povName = entry.pov.name; el('span', 'sh-nvl-povname', p, povName); }
+    }
+    this.nvlPov = pov;
     if (entry.name) {
       const n = el('span', 'sh-nvl-name', p, entry.name);
       if (entry.color) n.style.color = entry.color;
     }
     const body = el('span', 'sh-nvl-text', p);
     renderRuns(body, entry.runs || [], { quotes: entry.name && this.quotes ? this.quotes : null, shown: !!instant });
-    return { p, body };
+    return { p, body, povName };
   }
 
   // Adds a paragraph, first turning the page when it would not fit.
@@ -251,13 +265,16 @@ export class TextUI {
   say(h, { cps, onDone, onClickWait }) {
     const isDialogue = !!h.name;
     const quotes = isDialogue && this.quotes ? this.quotes : null;
-    this.live.textContent = (h.name ? h.name + ': ' : '') + h.plain;
+    // Screen readers hear the POV name where it is shown: on every ADV line,
+    // on the first paragraph of a POV run in NVL.
+    const announce = (povName) => { this.live.textContent = (h.name ? h.name + ': ' : povName != null ? '(' + povName + ') ' : '') + h.plain; };
     this.ctc.classList.remove('on');
     this.choices.classList.remove('on');
     this.showBox(true);
     if (h.mode === 'nvl') {
       this.setMode('nvl');
-      const { p, body } = this.appendNvl(h);  // turns the page when it is full
+      const { p, body, povName } = this.appendNvl(h);  // turns the page when it is full
+      announce(povName);
       this.nvlTyper = new Typewriter(body);
       this.nvlCtc = el('span', 'sh-ctc sh-nvl-ctc', p, '▼');
       this.nvlTyper.start(h.runs, { cps, quotes, onDone: () => { this.nvlCtc.classList.add('on'); onDone && onDone(); }, onClickWait: () => { this.nvlCtc.classList.add('on'); onClickWait && onClickWait(); } });
@@ -265,6 +282,7 @@ export class TextUI {
       return;
     }
     this.setMode('adv');
+    announce(h.pov && !isDialogue ? h.pov.name : null);
     this.root.classList.toggle('sh-narration', !isDialogue);
     this.namebox.classList.toggle('on', isDialogue);
     this.name.textContent = h.name || '';

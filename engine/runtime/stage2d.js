@@ -7,7 +7,7 @@
 
 import { Tweens, EASE, lerp } from './tween.js';
 import { Weather, Burst } from './particles.js';
-import { own } from './assets.js';
+import { own, blinks } from './assets.js';
 
 const TAU = Math.PI * 2;
 
@@ -465,7 +465,8 @@ export class Stage {
     if (v.prevImg && v.xfade < 1) { draw(v.prevImg, a * (1 - v.xfade)); draw(cur, a * v.xfade); }
     else draw(cur, a);
     if (st.kind === 'character') {
-      const blink = decl.blink && this.t < v.blinkUntil ? this.assets.get(this.assets.overlayPath(decl, 'blink', st.attrs)) : null;
+      // No blink while the current look already has the eyes closed (`noblink:`).
+      const blink = this.t < v.blinkUntil && blinks(decl, st.attrs) ? this.assets.get(this.assets.overlayPath(decl, 'blink', st.attrs)) : null;
       if (blink) draw(blink, a);
       if (decl.mouth && this.speaking === st.id && this.typing && Math.floor(this.t * 9) % 2 === 0) {
         const m = this.assets.get(this.assets.overlayPath(decl, 'mouth', st.attrs));
