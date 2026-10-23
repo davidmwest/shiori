@@ -136,7 +136,7 @@ shiori serve my-game              # play it in a browser (Part 4.6)
 
 1. `game.story` starts with `SHIORI 1` and a `title:` line. Other files are listed with `include:`.
 2. Every story line belongs to a scene. A scene starts with `# id` at the very start of a line.
-3. Declare every character, image, sound and variable you use. Declarations can go anywhere outside choice/`@if` blocks and their order doesn't matter, but the top of a file is clearest.
+3. Declare every character, image, sound and variable you use. Declarations can go anywhere outside choice/`@if` blocks and their order doesn't matter, but the top of a file is clearest. Before a file's first scene, only declarations and `@note` may appear.
 4. Dialogue uses the character's **id**, exactly: `mio:`, not `Mio:`.
 5. A line that is not a command, choice, jump, scene or dialogue is narration. Write plenty of it (Part 3.2).
 6. Choices are consecutive `* ` lines at the same indentation. Their bodies are indented under them.
@@ -165,9 +165,9 @@ my-game/
 ```
 
 - All paths in a game (`include:`, image files, music) are **relative to the folder that holds `game.story`**.
-- Story files are UTF-8 text. Line endings may be `\n` or `\r\n`.
+- Story files are UTF-8 text (a leading byte-order mark is ignored). Line endings may be `\n` or `\r\n`.
 - `game.story` must start with the version line `SHIORI 1`. Other `.story` files should start with it too (a warning otherwise).
-- List other story files in the header: `include: story/ch1.story story/ch2.story` (several per line, or several `include:` lines). `shiori check` warns about `.story` files in the folder that are not included.
+- List other story files in the header: `include: story/ch1.story story/ch2.story` (several per line, or several `include:` lines). `./story/ch1.story` and `story/ch1.story` are the same file, and a file listed twice is loaded once. `shiori check` warns about `.story` files in the folder that are not included.
 - Scene ids, character ids, asset ids and variable names are global across all files.
 
 ## 2.2 Lines, comments and indentation
@@ -194,7 +194,9 @@ Blank lines are ignored everywhere. They never end a block.
 2. `@if`, `@elif`, `@else` — their bodies;
 3. a declaration — its properties (`key: value` lines, see 2.9).
 
-Indent with spaces (two is conventional) or tabs (counted as four). All lines of one block must line up. Any other indentation is an error (E102).
+Indent with spaces (two is conventional) or tabs (counted as four). All lines of one block must line up. Any other indentation is an error (E102), including lines indented under any other command (`@set`, `@show`...).
+
+No-break spaces (U+00A0) and full-width spaces (U+3000) are not indentation. One at the start of a command, choice, jump or dialogue line is an error (E101); at the start of narration it is kept as part of the text.
 
 ## 2.3 Version line and header
 
@@ -216,6 +218,8 @@ ai_generated: story music
 include: story/ch1.story story/ch2.story
 ```
 
+Indented lines continue a field, also after a value on the key line (`include: story/ch1.story` with `story/ch2.story` indented on the next line). Comment lines inside a field are skipped. A header field after the first `@` or `#` line, or in a file other than `game.story`, is an error (E112).
+
 Field names are lowercase. Unknown fields are a warning with a suggestion (W604). The full list, with defaults, is in Appendix B ("Header fields"). The fields that feed the VNDB report are explained in Part 3.2.
 
 ## 2.4 Scenes and jumps
@@ -224,10 +228,10 @@ Field names are lowercase. Unknown fields are a warning with a suggestion (W604)
 # harbor_night "The Harbor at Night"
 ```
 
-- `#`, a space, the scene id, then optionally a title in double quotes. The `#` must be in column 1.
+- `#`, a space, the scene id, then optionally a title in double quotes, and nothing else: `# harbor bg=dusk` is an error (E104); put `@scene dusk` on the next line. The `#` must be in column 1.
 - Ids use letters, digits, `_` and `.`, and start with a letter or `_`: `ch1.harbor` is fine.
 - A scene runs from its heading to the next heading.
-- **Jumps:** `-> scene_id` goes to a scene. `-> END` ends the game (back to the title screen). `@jump scene_id` is the same as `->`.
+- **Jumps:** `-> scene_id` goes to a scene. `-> END`, in capitals, ends the game (back to the title screen). `@jump scene_id` is the same as `->`. Lines after a jump in the same block never run; `shiori check` warns about them (W622).
 - **Fall-through:** if a scene ends without a jump, the story continues into the next scene *in the same file*. At the end of a file there is nothing to continue into, so the game ends there; `shiori check` warns (W603). End the last scene of each file with an explicit jump or `-> END`.
 - **Calls:** `@call flashback` runs the scene `flashback` until it reaches `@return`, then continues after the `@call`. Use it for scenes reused from several places. A called scene may contain menus and jump to other scenes; whichever reaches `@return` first returns to the caller.
 - The game starts at the scene named by the header field `start:`, or else at the first scene in `game.story`.
@@ -270,7 +274,9 @@ A line like `Old Man: Who goes there?` (capitalised words before a colon) is sho
 
 **Renaming.** `@rename rin "???"` shows "???" for Rin until `@rename rin` restores her name — across scenes, and in saves. Everything that shows her name uses the current one: the name plate, the backlog, and the `@pov` label.
 
-**Unknown speakers.** A single word before the colon (`Mayor: ...`) must be a declared character id, or it is error E114 (the hint suggests the character whose display name contains that word). Several capitalised words (`Old Man: ...`) are taken as narration with warning W608.
+**Unknown speakers.** A single word before the colon (`Mayor: ...`, `Élodie: ...`; any letters count, not only ASCII) must be a declared character id, or it is error E114 (the hint suggests the character whose display name contains that word). Ids are ASCII: declare `@character elodie name="Élodie"` and write `elodie: ...`. Several capitalised words (`Old Man: ...`, `José Luis: ...`) are taken as narration with warning W608.
+
+W608 also flags other lines that look like dialogue but will be shown as narration: `mio：…` (a full-width colon), `mio:Hi` (no space after the colon), `“Ferryman”: …` (curly quotes), Ren'Py's `mio "Hi"`, and a short Chinese, Japanese, Korean or Thai name before the colon (`ミオ: …`).
 
 **Point of view.** `@pov rin` marks the following narration as seen through Rin's eyes; the player shows her current name (after any `@rename`) and color on narration, and the backlog records it. `@pov none` clears it. It lasts until changed — `@scene` does not reset it. Use it when the narrator changes (Part 3.3).
 
@@ -295,7 +301,13 @@ Inside narration, dialogue and choice text:
 | `{$name}` | The value of a variable. |
 | `{{` and `}}` | Literal braces. |
 
-Tags must be closed in order: `{b}{i}x{/i}{/b}`. Unknown tags are errors with a suggestion (E500).
+Tags must be closed in order: `{b}{i}x{/i}{/b}`. The same tag may be nested; closing the inner one restores the outer value (in `{color=#ff6688}a {color=#ffffff}b{/color} c{/color}`, `c` is pink again). Unknown tags are errors with a suggestion (E500).
+
+Breaking any of these rules is error E502:
+
+- `{size=…}` and `{speed=…}` need a plain number above 0; `{w=…}` a plain number of seconds, 0 or more.
+- Inside `{ruby=…}…{/ruby}` put only text and `{$name}`. Put other tags around the whole ruby: `{b}{ruby=かんじ}漢字{/ruby}{/b}`.
+- `{nw}` must end the line.
 
 ## 2.7 Choices
 
@@ -345,7 +357,7 @@ They combine: `* [once] [if met_rin] Ask about Rin.`
 * That's all. -> evening
 ```
 
-If every option is hidden or locked, the menu is skipped with runtime warning R704, so always keep one unconditional option.
+If every option is hidden or locked, the menu is skipped with runtime warning R704 and the story continues after it, so always keep one unconditional option.
 
 **Choice numbers** in the tools (`shiori play --choices`, `shiori explore` routes) are each option's position as written in the script (1 = the first `*` line of the menu), not its position among the options currently visible. If options 1–4 are `[once]` questions already asked, "Say goodbye" is still `5`. `shiori play` prints every option with its number, marking hidden ones as "already picked" or "hidden: [if …]". (In the browser player, the 1–9 keys pick the *visible* options in order, as players expect.)
 
@@ -371,6 +383,8 @@ If every option is hidden or locked, the menu is skipped with runtime warning R7
 | `+` `-` `*` `/` `%` `( )` | Arithmetic (`+` also joins strings). |
 | `"text"`, `12`, `true`, `false` | Literals. |
 
+Comparisons don't chain: write `1 < x and x < 5`, not `1 < x < 5` (E400). Comparing a true/false value with `<`, `<=`, `>` or `>=`, as in `(1 < x) < 5`, is warning W623. In a string in a condition or value, a backslash escapes only `\"`, `\'` and `\\`; any other, such as `\n`, is an error (E400). For a line break, put `{br}` in the text line.
+
 Functions: `visited("scene")`, `ending_seen("id")`, `endings_seen()`, `random(1, 6)`, `chance(0.3)`, `min`, `max`, `clamp`, `abs`, `floor`, `ceil`, `round`, `len`, `upper`, `lower` (Appendix B). Random numbers come from a seed stored in the save, so they are reproducible on load and in `shiori play --seed`.
 
 ```shiori
@@ -382,11 +396,11 @@ Functions: `visited("scene")`, `ending_seen("id")`, `endings_seen()`, `random(1,
   mio: No.
 ```
 
-Variables appear in text as `{$nickname}`. `@assert trust >= 0` checks an invariant: `shiori explore` reports every route where an assertion fails. A message in quotes may follow the condition: `@assert ran_to == "hinata" or ran_to == "suzu" "ran_to must be set before the finale"` (the last quoted string is the message, never part of the condition).
+Variables appear in text as `{$nickname}`. `@assert trust >= 0` checks an invariant: `shiori explore` reports every route where an assertion fails. A message in quotes may follow the condition: `@assert ran_to == "hinata" or ran_to == "suzu" "ran_to must be set before the finale"` (a trailing quoted string is the message only when the text before it is already a complete condition, so `@assert route == "rin"` compares with `"rin"`).
 
 ## 2.9 Declarations
 
-Declarations are compile-time: they apply to the whole game wherever they appear (but not inside choice or `@if` blocks, E305). Any declaration may take its properties inline (`key=value`) or as an indented block of `key: value` lines.
+Declarations are compile-time: they apply to the whole game wherever they appear (but not inside choice or `@if` blocks, E305). Only declarations and `@note` may come before a file's first `# scene_id`; any other command there is an error (E103; an unknown one, E300). Any declaration except `@var` and `@persistent` may take its properties inline (`key=value`) or as an indented block of `key: value` lines (`@video` only in its declaring form, `@video id path`).
 
 ### Characters
 
@@ -404,7 +418,7 @@ Declarations are compile-time: they apply to the whole game wherever they appear
 ```
 
 - `name`, `color` (name-plate color).
-- **Attribute groups.** Every key that is not a known property is an attribute group: `expression: neutral smile sad` declares the group `expression` with three values; the first is the default. Attribute names must be unique across a character's groups.
+- **Attribute groups.** Every key that is not a known property is an attribute group: `expression: neutral smile sad` declares the group `expression` with three values; the first is the default. Attribute names must be unique across a character's groups. A misspelt property given a single value or free text (`nmae: Mio Tanaka`) is error E302, not a new group.
 - **Images.** `sprite:` is a path template; `{group}` is replaced by the current value of that group. `sprite: chars/mio/{pose}_{expression}.png` needs one file per combination. For layered art, use several `layer:` lines instead (drawn bottom to top), each with its own placeholders:
 
   ```shiori
@@ -433,6 +447,7 @@ Declarations are compile-time: they apply to the whole game wherever they appear
 ```
 
 - One namespace holds characters and assets, so ids must be unique among them. `all`, `none`, `stop`, `black`, `white`, `cg` are reserved.
+- `@position` names are their own namespace. Each is declared once and can't reuse a built-in position name such as `left` (E204).
 - Images: SVG, PNG, JPG, WebP, GIF, AVIF. A background image is scaled to cover the screen (`fit=contain` or `fit=none` to change that). An image shown with `@show` is a prop, positioned like a character.
 - Audio: OGG, MP3, WAV, M4A, or an **LMN song** (`.lmn`, or `.txt` whose first line is `LMN 1`): plain-text music that the player synthesises live (2.13).
 - `@video id path` declares; `@video id` plays.
@@ -460,8 +475,8 @@ The stage has a background, characters and props, an optional full-screen CG on 
 - **Waiting.** "Waits" means the next line appears only after the transition finishes. Override with `wait=true` or `wait=false`. The player can click to finish any transition early.
 - **`@show` vs `@move`.** `@show` on someone already on stage changes her attributes with a quick dissolve and repositions her in that time; `@move` slides her over `time=` with `ease=`.
 - **Filters don't stack.** A new `@filter` replaces the current one (`@filter none` clears it). For an extra colour wash on top, use `@tint`.
-- **`@camera` keeps what you leave out.** Each `@camera` changes only the arguments you give; `@camera reset` returns to zoom 1, no pan and no 3D marks. `from=`, `look=`, `fov=` and `orbit=` only apply in 3D worlds (runtime warning R705 otherwise).
-- **Positions** (`at=`): `farleft` `left` `midleft` `center` `midright` `right` `farright` (and `offleft`/`offright` for entering from off-screen), a number from 0 (left edge) to 1 (right edge), a percentage (`40%`), or a name declared with `@position`. If `at=` is omitted, a new character takes the first free spot of center, left, right, farleft, farright.
+- **`@camera` keeps what you leave out.** Each `@camera` changes only the arguments you give; `@camera reset` returns to zoom 1, no pan and no 3D marks (in a 3D world, to the world's `camera=` mark). `from=`, `look=`, `fov=` and `orbit=` only apply in 3D worlds (runtime warning R705 otherwise).
+- **Positions** (`at=`): `farleft` `left` `midleft` `center` `midright` `right` `farright` (and `offleft`/`offright` for entering from off-screen), a number from 0 (left edge) to 1 (right edge), a percentage (`40%`), or a name declared with `@position`, which also applies its `y=` and `scale=` (the other forms set only the horizontal position). If `at=` is omitted, a new character takes the first free spot of center, left, right, farleft, farright.
 - **Attributes are remembered.** A character keeps her last attributes when hidden and shown again, across scenes — including attributes given on dialogue lines while she was off stage (`nagi (surprised): ...` with no sprite shown still sets her expression for the next `@show`). Give attributes on every `@show` when it matters.
 - **What `@scene` resets:** background, characters, CG, weather, filter, tint and camera. It does **not** change music, text mode (ADV/NVL), `@pov`, `@rename`d names or variables.
 - **Transitions** (`with=`): `none` `fade` `fade_white` `dissolve` `flash` `wipe_left` `wipe_right` `wipe_up` `wipe_down` `iris_in` `iris_out` `slide_left` `slide_right` `slide_up` `slide_down` `pixelate` `blinds`. Times are seconds (`time=1.5`) or milliseconds (`time=300ms`).
@@ -481,6 +496,7 @@ A background can be a real-time 3D world instead of a picture:
 
 - A world is a `.glb`/`.gltf` file, or a JavaScript module that builds the scene with three.js (Part 4.4). Worlds move: water, particles and lights animate on their own.
 - **Marks** are named places in a world (empties named `mark_<name>` in a glTF file, or names a module defines). List them with `marks="..."` so `shiori check` can catch typos; then use them in `at=`, and in `@camera from=` (where the camera stands) and `look=` (what it looks at).
+- `camera=` on `@world` names the mark the camera starts at, and must be one of its `marks=` (E303). `@scene` and `@bg` into a world start there, and `@camera reset` goes back to it. `@bg` from a world to a 2D background resets the camera.
 - `@camera` in 3D: `from=`, `look=`, `fov=`, `zoom=`, `orbit=degrees`, `time=`, `ease=`.
   - `from=mark` moves the camera to that mark; with no `look=`, it looks where the mark itself faces (its default `look`).
   - `look=mark` (or a character id shown in 3D) turns the camera to face it, from wherever it stands.
@@ -510,6 +526,8 @@ mio: You came back.
 @stop all
 ```
 
+`@music` with the track that is already playing keeps it playing and applies only the `volume=` and `loop=` written on that line: `@music theme volume=0.4` lowers it, and a bare `@music theme` leaves the volume as it was.
+
 **LMN music.** An `@audio` whose file is an LMN song (`.lmn`, or a `.txt` starting with `LMN 1`) is synthesised live by the player: strings, piano, harp, brass, drums and sung lyrics, with no audio files. Language models can write LMN directly; see `LMN-Spec.md`. Leitmotifs are easy: write a character's theme once and re-arrange it for each mood.
 
 ## 2.14 Chapters, endings, input, waits, gameplay, video
@@ -525,17 +543,17 @@ mio: You came back.
 ```
 
 - `@chapter` shows a title card and names save files.
-- `@ending id "Title" kind=…` records the ending **when it is reached** (permanently: `ending_seen("id")` becomes true in every later playthrough) and shows an ending card. Then the story simply continues: follow it with an epilogue or credits and `-> END`. If it jumps back into the story (for example `-> hub`), `shiori check` warns (W620) in case that was a slip. Kinds: `true`, `good`, `normal`, `bad`, `joke`. Ending ids are their own namespace (they may share names with scenes). A kinetic novel can still mark its single ending (`kind=normal` or `true`) so it shows in the endings list.
+- `@ending id "Title" kind=…` records the ending **when it is reached** (permanently: `ending_seen("id")` becomes true in every later playthrough) and shows an ending card. Then the story simply continues: follow it with an epilogue or credits and `-> END`. If it jumps back into the story (for example `-> hub`), `shiori check` warns (W620) in case that was a slip. Kinds: `true`, `good`, `normal`, `bad`, `joke`. An ending has one title and one kind: a later `@ending` with the same id may repeat them or leave them out (`@ending lanterns_home`), but a different title or kind is an error (E204). Ending ids are their own namespace (they may share names with scenes). A kinetic novel can still mark its single ending (`kind=normal` or `true`) so it shows in the endings list.
 - `@input` asks for text (a string variable).
 - `@wait` pauses for seconds; `@pause` waits for a click.
 - `@video` plays a declared video. `kind=opening|ending` are not counted as "cutscenes" by VNDB.
-- `@game` runs a gameplay module and stores its result in the `into=` variable, which must be a declared string (`@var r = ""`; test it with `@if r == "win"`). Declare the module's typical length with `@gameplay … minutes=` (the VNDB report compares it with reading time) and its possible results with `results=` so `shiori explore` tries each one; replay a specific result with `shiori play --game id=result`. The module itself is a small JavaScript file (Part 4.5); `shiori check` confirms it exports a `play()` function.
+- `@game` runs a gameplay module and stores its result in the `into=` variable, converted to that variable's type: a string variable gets the text (`@var r = ""`; test it with `@if r == "win"`), a number variable a number, a true/false variable `true` or `false`. A result that doesn't fit is reported (R700) and leaves the variable unchanged. Declare the module's typical length with `@gameplay … minutes=` (the VNDB report compares it with reading time) and its possible results with `results=` so `shiori explore` tries each one; replay a specific result with `shiori play --game id=result`. The module itself is a small JavaScript file (Part 4.5); `shiori check` confirms it exports a `play()` function.
 
 ## 2.15 Errors and robustness
 
 - `shiori check` (and the player's developer overlay) report every problem with file, line, column, a code, the source line and usually a fix. Errors stop the game from running; warnings don't.
-- Saves store a stable position (scene + line id), so a save made before you edit the script still loads afterwards, at the same line if it still exists, otherwise at the start of its scene.
-- At runtime the player never crashes on a story problem: a bad jump or failed assertion is logged and shown in developer mode, and the story continues where possible.
+- Saves store a stable position (scene, line or menu id, and the nearest line before it), so a save made before you edit the script still loads afterwards: at the same line, menu or command if it can still be found (an edited line is found in its place), otherwise at the start of its scene. A save made at `@input`, `@game`, `@pause`, `@wait`, `@video`, `@chapter` or `@ending` shows it again on load.
+- At runtime the player never crashes on a story problem: a bad jump or failed assertion is logged and shown in developer mode, and the story continues where possible. A condition that can't be evaluated (for example, division by zero) is reported (R700) and counts as false: `@if` moves on to its `@elif` or `@else`, an option's `[if]` hides it and its `[require]` locks it.
 
 ---
 
@@ -545,13 +563,13 @@ mio: You came back.
 
 1. **Plan** the cast (ids, names, colors, attribute groups), the scenes (ids and one-line summaries), the variables, and the endings. Write the declarations first.
 2. **Write** scene by scene. Keep each file to a chapter or a route; list files in `include:`.
-3. **Check:** `shiori check`. Fix every error; read every warning. Repeat until clean.
-4. **Explore:** `shiori explore`. It plays every combination of choices, `@game` results and `random()`/`chance()` outcomes. Make sure every ending is reachable, no route ends without an `@ending` (unless the game is a kinetic novel), there are no runtime errors, no condition is "always true" by mistake, and no lines are unreachable by accident. Each ending comes with a checked, ready-made `shiori play` command that replays it (with `--seen` for unlocks, `--game` for gameplay results and `--rolls` for random outcomes). Big hub menus and loops multiply routes; if it says STOPPED EARLY, raise `--max-states` (default 250000) — "not reached" then only means "not reached yet".
-5. **Read** a route with `shiori play --choices 1,2,1` (or `--from scene`, `--set trust=3`, `--seen a,b` — each id counts toward `endings_seen()`; `--set` also sets `@persistent` variables). Reading your own transcript catches continuity and pacing problems that no checker can — especially inside `@if` branches you didn't take. When it stops at a choice, it prints the exact command to continue. Repeating a list flag adds to it (`--seen a --seen b`).
+3. **Check:** `shiori check`. Fix every error; read every warning. Repeat until clean. It also warns about scenes that no jump, choice or fall-through leads to (W600) and lines after a jump that can never run (W622).
+4. **Explore:** `shiori explore`. It plays every combination of choices, `@game` results, `@input` answers (the default and, when a condition tests the answer, the strings it is compared with and a sample name) and `random()`/`chance()` outcomes. Games that use `ending_seen()`, `endings_seen()` or `@persistent` are played again from every different set of endings and persistent values a playthrough can end in, up to 16 playthroughs in a row and 64 different sets; past that it stops replaying and says so (R706). Make sure every ending is reachable, no route ends without an `@ending` (unless the game is a kinetic novel), there are no runtime errors, no condition is "always true" by mistake, and no lines are unreachable by accident. Each ending comes with a checked, ready-made `shiori play` command that replays it (with `--seen` for unlocks, `--game` for gameplay results, `--rolls` for random outcomes, and typed answers in `--choices`). Big hub menus and loops multiply routes; if it says STOPPED EARLY, raise `--max-states` (default 250000). After STOPPED EARLY or R706, "not reached" only means "not reached yet".
+5. **Read** a route with `shiori play --choices 1,2,1` (or `--from scene`, `--set trust=3`, `--seen a,b` — each id counts toward `endings_seen()`; `--set` also sets `@persistent` variables). At an `@input`, the next `--choices` entry is typed as the answer if it isn't a number (`--choices 1,Aoi,2`); otherwise the default is used. Reading your own transcript catches continuity and pacing problems that no checker can — especially inside `@if` branches you didn't take. When it stops at a choice, it prints the exact command to continue. Repeating a list flag adds to it (`--seen a --seen b`).
 6. **VNDB (if you want an entry):** `shiori vndb` reads the game against VNDB's guidelines and drafts the entry. It is advice, not a gate: VNDB's editors judge each game as a whole, and whether your game should be a visual novel at all is your decision.
 7. **Look:** `shiori serve` and open the printed URL (Part 4.6). `player.html?game=…&scene=…&dev=1` jumps straight to a scene with the developer panel; with live reload on, saving a `.story` file updates the running game at the same line.
 
-`shiori check` also warns about things readers notice: 30+ lines in a row with no visual change at all (W616), 30+ lines of dialogue with no narration (W614), and ADV lines too long for the textbox (W619). While art and music don't exist yet, it groups the "file not found" warnings into one line; `shiori check --assets` lists them, and `shiori assets` shows where every file is used (with the filter and weather around it) and which expressions each character actually uses. Add `desc="..."` to any `@image`, `@audio`, `@world`… declaration to keep the brief for the artist or composer next to it.
+`shiori check` also warns about things readers notice: 30+ lines in a row with no visual change at all (W616), 30+ lines of dialogue with no narration (W614), and ADV lines too long for the textbox (W619). Both runs are counted along the story's flow: each choice and `@if` branch separately, and on through jumps and fall-through. While art and music don't exist yet, it groups the "file not found" warnings into one line; `shiori check --assets` lists them, and `shiori assets` shows where every file is used (with the filter and weather around it) and which expressions each character actually uses. Add `desc="..."` to any `@image`, `@audio`, `@world`… declaration to keep the brief for the artist or composer next to it.
 
 `shiori stats --by-scene` gives word counts per scene, for trimming to a length.
 
@@ -572,8 +590,8 @@ VNDB has removed games for having no narration at all (Persona 3/4, Ghost Trick,
 - **Shiori's text is always ADV or NVL**, which VNDB recognises. Mixing both is fine (tag "ADV/NVL Mixing").
 - **Disclose AI content honestly.** VNDB accepts AI-made games and tags them (AI-generated Story, Music, Sprites, Backgrounds, CGs, Voice Acting, Assets). Fill the header field `ai_generated:` (for example `ai_generated: story music`); `shiori vndb` turns it into the right tags, and `translation` sets the release's machine-translation flag.
 - **Fill the header** so the report can draft your entry: `title`, `original_title`, `developer`, `description`, `language`, `status`, `release_type`, `release_date`, `age_rating`, `ero`, `freeware`, `platforms`. Give characters `role`, `gender`, `age`, `description`.
-- VNDB's **length** is the time to finish all endings; the report estimates it from your word count at `reading_speed:` words per minute (Very short < 2 h, Short 2–10 h, Medium 10–30 h, Long 30–50 h, Very long > 50 h).
-- Release flags the report fills in for you: resolution, voiced (from `@voice` coverage), animation (VNDB does **not** count zooms, shakes or sprite movement as animation; lip/eye movement and background effects are separate checkboxes), engine name ("Shiori").
+- VNDB's **length** is the time to finish all endings; the report estimates it from your word count at `reading_speed:` words per minute (Very short < 2 h, Short 2–10 h, Medium 10–30 h, Long 30–50 h, Very long > 50 h). Words are counted in any script: Chinese and Japanese as characters ÷ 2; Thai, Lao, Khmer and Myanmar as about letters ÷ 4; every other script, Korean included, by space-separated words.
+- Release flags the report fills in for you: resolution, voiced (from `@voice` coverage per character, not counting the protagonist and minor speakers, as VNDB does), animation (VNDB does **not** count zooms, shakes or sprite movement as animation; lip/eye movement and background effects are separate checkboxes), engine name ("Shiori").
 
 ## 3.3 Craft
 
@@ -599,10 +617,14 @@ VNDB has removed games for having no narration at all (Persona 3/4, Ghost Trick,
 |---|---|---|
 | `Mio: Hello.` | `mio: Hello.` | Speakers are character ids (E114). |
 | `Old Man: Hi.` | `"Old Man": Hi.` | One-off speakers need quotes (W608). |
+| `mio：Hello.` | `mio: Hello.` | An ASCII colon and a space (W608). |
 | `@if trust = 2` | `@if trust == 2` | `=` assigns (E401). |
+| `@if 0 <= trust <= 3` | `@if 0 <= trust and trust <= 3` | Comparisons don't chain (E400). |
+| `@set trust == 2` | `@set trust = 2` | `==` compares (E402). |
 | `@set trust++` | `@set trust += 1` | No `++` (E402). |
 | `@endif` / `@end` | *(delete it)* | Blocks end by indentation (W615). |
 | `@goto harbor` / `@jump_to harbor` | `-> harbor` | (E300) |
+| `-> end` | `-> END` | `END` is in capitals (E200). |
 | `@menu` + `@option` | `* option` lines | Choices are `*` lines. |
 | `@show Mio happy` | `@show mio smile` | Ids and attributes as declared (E202, E203). |
 | `@scene harbor` before `@image harbor ...` exists | declare first | (E202) |
@@ -724,7 +746,7 @@ export default async function play({ container, params, width, height, signal })
 
 ## 4.6 Running a game in the browser
 
-Run `shiori serve games/my-game` (the game folder must be inside the engine folder) and open the URL it prints, or serve the engine folder with any static web server (for example `python3 -m http.server 8777`) and open:
+Run `shiori serve games/my-game`, or `shiori serve` inside the game folder (the game folder must be inside the engine folder), and open the URL it prints, or serve the engine folder with any static web server (for example `python3 -m http.server 8777`) and open:
 
 `http://localhost:8777/player.html?game=examples/lantern-keeper`
 
@@ -746,7 +768,13 @@ To publish, copy the engine's `player.html`, `engine/` and your game folder to a
 
 ## 4.7 Save format
 
-A save is JSON: `{ format: 'shiori-save', version: 1, programHash, time, chapter, scene, preview, position: {scene, offset, id}, calls, state, backlog }` plus a thumbnail in the browser. Persistent data (endings, read lines, unlocked CGs, music, persistent variables) is stored separately per game.
+A save is JSON: `{ format: 'shiori-save', version: 1, game, programHash, time, chapter, scene, preview, position, calls, state, backlog, halt }` plus a thumbnail in the browser.
+
+- `position` is `{scene, offset, id, op, after, n, k}`: the scene, the offset into it, the line or menu id, the kind of instruction (`op`), the id of the nearest instruction before it that has one (`after`), and which instruction of that kind it is after `after` (`n`) and in the scene (`k`). This is how a save finds its place in an edited script.
+- `calls` holds one position per `@call` still to return from, with the position of the `@call` itself as `call`.
+- `halt` is only there for saves made at `@input`, `@game`, `@pause`, `@wait`, `@video`, `@chapter` or `@ending`.
+
+Persistent data (endings, read lines, unlocked CGs, music, persistent variables) is stored separately per game.
 
 ---
 
@@ -2114,14 +2142,14 @@ file        := version? header? body
 version     := "SHIORI" SP "1" NL
 header      := (field NL)*                      ; game.story only, before the first "@" or "#"
 field       := key ":" SP? value (NL INDENT text)*
-body        := (decl | scene | comment | blank)*
-scene       := "#" SP id (SP quoted)? NL block   ; key=value after the title is reserved
+body        := (decl | note | comment | blank)* scene*   ; only declarations and @note before the first scene
+scene       := "#" SP id (SP quoted)? NL block   ; nothing may follow the title
 block       := statement*                       ; all at one indentation
 statement   := comment | command | jump | menu | narration | dialogue
 command     := "@" name (SP arg)* (SP "//" text)? NL props? body?
 arg         := value | key "=" value
 value       := word | quoted
-props       := (INDENT key ":" SP? text NL)+    ; declarations
+props       := (INDENT key ":" SP? text NL)+    ; @character @image @audio @world @model @gameplay @position, @video id path
 body        := INDENT block                     ; @if, @elif, @else
 jump        := "->" SP? (id | "END") NL
 menu        := option+
@@ -2135,4 +2163,5 @@ expr        := or ; or := and ("or" and)* ; and := not ("and" not)* ; not := "no
 cmp         := sum (("=="|"!="|"<"|"<="|">"|">=") sum)?
 sum         := term (("+"|"-") term)* ; term := unary (("*"|"/"|"%") unary)* ; unary := "-"? atom
 atom        := number | string | "true" | "false" | name | name "(" (expr ("," expr)*)? ")" | "(" expr ")"
+string      := '"' ([^"\\] | "\\" ["'\\])* '"' | "'" ([^'\\] | "\\" ["'\\])* "'"
 ```
