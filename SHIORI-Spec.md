@@ -196,7 +196,7 @@ Blank lines are ignored everywhere. They never end a block.
 
 Indent with spaces (two is conventional) or tabs (counted as four). All lines of one block must line up. Any other indentation is an error (E102), including lines indented under any other command (`@set`, `@show`...).
 
-No-break spaces (U+00A0) and full-width spaces (U+3000) are not indentation. One at the start of a command, choice, jump or dialogue line is an error (E101); at the start of narration it is kept as part of the text.
+No-break spaces (U+00A0) and full-width spaces (U+3000) are not indentation. One at the start of a command, choice, jump or dialogue line is an error (E101); at the start of narration it is kept as part of the text. The exception is narration right under a choice that has no indented lines: it can only be meant as that choice's lines, so it is E101 too. After the last choice of a menu, a full-width space is read as a paragraph indent, unless the choice above had such a line as well.
 
 ## 2.3 Version line and header
 
@@ -278,7 +278,7 @@ A line like `Old Man: Who goes there?` (capitalised words before a colon) is sho
 
 **Unknown speakers.** A single word before the colon (`Mayor: ...`, `Élodie: ...`, `O'Brien: ...`; any letters count, not only ASCII) must be a declared character id, or it is error E114. The hint names the character it most likely means (the same id in other letter case, the display name, or a word of it), or else an id to declare. Ids are ASCII letters, digits and `_`: declare `@character elodie name="Élodie"` and write `elodie: ...`; for `O'Brien:` the hint suggests the id `obrien`. Several capitalised words (`Old Man: ...`, `José Luis: ...`) are taken as narration with warning W608.
 
-W608 also flags other lines that look like dialogue but will be shown as narration: `mio：…` (a full-width colon), `mio:Hi` (no space after the colon), `“Ferryman”: …` (curly quotes), Ren'Py's `mio "Hi"`, and a short Chinese, Japanese, Korean or Thai name before the colon (`ミオ: …`).
+W608 also flags other lines that look like dialogue but will be shown as narration: `mio：…` (a full-width colon), `mio:Hi` (no space after the colon), `“Ferryman”: …` (curly quotes), Ren'Py's `mio "Hi"` (any one word, `Élodie "Bonjour."` too), and a short Chinese, Japanese, Korean or Thai name before the colon (`ミオ: …`). Ordinary prose has the first two shapes too, so they get W608 only when the word is a lowercase id (`mio`), the id or display name of a character declared in the same file (`Mio:Hi`, `Élodie:Bonjour.`), or, before `：`, a name written in kana (`ミオ：…`). `Note:the tide is in.`, `Re:Zero`, `C:\Windows` and `時刻：午後三時。` stay plain narration. The hint gives the line with the character's id.
 
 **Point of view.** `@pov rin` marks the following narration as seen through Rin's eyes; the player shows her current name (after any `@rename`) and color on narration, and the backlog records it. `@pov none` clears it. It lasts until changed — `@scene` does not reset it. Use it when the narrator changes (Part 3.3).
 
@@ -337,7 +337,7 @@ We sit, or we don't. Either way the kettle sings.
 | Modifier | Meaning |
 |---|---|
 | `[if condition]` | Only offered when the condition is true. |
-| `[require condition]` | Always shown, but locked (greyed out) until the condition is true. Add a hint in quotes to tell the player how to unlock it: `[require endings_seen() >= 1 "Unlocks after any ending"]`. |
+| `[require condition]` | Always shown, but locked (greyed out) until the condition is true. Add a hint in quotes to tell the player how to unlock it: `[require endings_seen() >= 1 "Unlocks after any ending"]`. The last quoted string is the hint only when the text before it is already a complete condition, so `[require route == "rin"]` compares with `"rin"`. In the hint, as in a quoted argument (2.9), `\"`, `\'` and `\\` are escapes and any other is E110. |
 | `[once]` | Hidden after it has been picked once in this playthrough. |
 
 They combine: `* [once] [if met_rin] Ask about Rin.`
