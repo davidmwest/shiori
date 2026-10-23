@@ -5,6 +5,7 @@
 import { Diagnostics } from './diagnostics.js';
 import { isLabelId } from './util.js';
 import { HEADER_FIELDS } from './header.js';
+import { parseExpr, ExprError } from './expr.js';
 
 // Commands whose argument text is kept raw (an expression or assignment).
 export const RAW_COMMANDS = new Set(['if', 'elif', 'else', 'set', 'var', 'persistent', 'assert', 'log']);
@@ -32,6 +33,81 @@ const RE_HEADER = /^([a-z][a-z0-9_]*)\s*:\s*(.*)$/;
 const RE_JUMP_TAIL = /\s->\s*([A-Za-z_][A-Za-z0-9_.]*)\s*$/;
 // Spaces that look like indentation but are not (no-break, full-width, ...).
 const RE_ODD_SPACE = /^[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000\uFEFF]+/;
+// After odd spaces, the start of a line that parseStatement reports as E101.
+const RE_ODD_STATEMENT = /^(@|->|\*|#|\|)/;
+// A speaker-like word: letters first, then letters, digits, _ ' ’ -.
+const SPEAKER_WORD = "[\\p{L}_][\\p{L}\\p{M}\\p{N}_'\u2019-]*";
+// `word:text` with no space after the colon. Not before /, \, a digit or a
+// second colon (`http://`, `C:\`, `C:/`, `10:30`, `std::`).
+const RE_NO_SPACE_COLON = new RegExp(`^(${SPEAKER_WORD})((?:\\s*\\([^()]*\\))?)\\s*:(?![\\/\\\\\\d:])(\\S.*)$`, 'u');
+// Ren'Py dialogue: `word "text"`.
+const RE_RENPY = new RegExp(`^(${SPEAKER_WORD})\\s+"(.*)"$`, 'u');
+// A name written only in kana (ミオ, みお): before `：` it is taken for a speaker
+// even when undeclared. A kanji word (時刻：) may be a label, so it must be declared.
+const RE_KANA_NAME = /^(?=.*[\p{Script=Hiragana}\p{Script=Katakana}])[\p{Script=Hiragana}\p{Script=Katakana}\u30FC\u30FB]+$/u;
+const isLowerId = (w) => w.length >= 2 && /^[a-z_][a-z0-9_]*$/.test(w);
+// Commands kept from the lines under a bad scene heading (see the E104 below)
+// when no registry is given: the declarations and `@note`.
+const DECL_COMMANDS = new Set(['character', 'image', 'audio', 'world', 'model', 'gameplay', 'position', 'var', 'persistent', 'note']);
+
+// Does src parse as an expression? The compiler reports the error if not.
+function parses(src) {
+  try { parseExpr(src); return true; } catch (e) { if (e instanceof ExprError) return false; throw e; }
+}
+
+// Where a "double-quoted string" that ends src starts, or -1. Strings are
+// found as in expressions (' or ", backslash escapes), so `\"` doesn't end
+// one and a quote inside the other kind is plain text. The string must
+// follow a space: `x "hint"`, not `x"hint"`.
+export function trailingStringAt(src) {
+  let q = null, start = -1, last = null;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (q) {
+      if (c === '\\') i++;
+      else if (c === q) { if (q === '"') last = { start, end: i + 1 }; q = null; }
+      continue;
+    }
+    if (c === '"' || c === "'") { q = c; start = i; }
+  }
+  if (q || !last || last.end !== src.length || last.start === 0 || !/\s/.test(src[last.start - 1])) return -1;
+  return last.start;
+}
+
+// The `]` that closes the `[` at s[0]: the first one outside quotes (a lock
+// hint may hold one: `[require key "Find the [key]"]`), else the first one.
+function closeBracketAt(s) {
+  let q = null;
+  for (let i = 1; i < s.length; i++) {
+    const c = s[i];
+    if (q) { if (c === '\\') i++; else if (c === q) q = null; continue; }
+    if (c === '"' || c === "'") q = c;
+    else if (c === ']') return i;
+  }
+  return s.indexOf(']');
+}
+
+// Where a ` // comment` starts in @log text, or -1. The text is free, so an
+// apostrophe is not a quote; a "..." pair hides a `//`, a lone " does not.
+function logCommentAt(s) {
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '"') {
+      const close = s.indexOf('"', i + 1);
+      if (close > 0) i = close;
+    } else if (s[i] === '/' && s[i + 1] === '/' && (i === 0 || s[i - 1] === ' ' || s[i - 1] === '\t')) return i;
+  }
+  return -1;
+}
+
+// Does this node always leave its block (a jump, `@return`, or a menu or
+// `@if` whose every path leaves)? The same test as leaves() in compiler.js.
+function alwaysLeaves(n) {
+  if (n.type === 'jump') return true;
+  if (n.type === 'cmd') return n.name === 'return' || (n.name === 'jump' && n.args.length > 0);
+  if (n.type === 'menu') return !n.options.every(o => o.mods.if || o.mods.require || o.mods.once) && n.options.every(o => o.target || o.body.some(alwaysLeaves));
+  if (n.type === 'if') return !!n.elseBody && n.elseBody.some(alwaysLeaves) && n.branches.every(b => b.body.some(alwaysLeaves));
+  return false;
+}
 
 // Heading words people write instead of a command on the next line.
 const HEADING_KEY_COMMANDS = {
@@ -78,8 +154,11 @@ function exprCommentAt(s) {
 // would silently change the text.
 const ARG_ESCAPES = ['\\', '"', "'"];
 function argEscapeHint(e, what) {
+  const hint = what === 'lock hint';
+  if ((e === 'n' || e === 'r') && hint) return `A lock hint is one line of text: remove the \`\\${e}\`.`;
   if (e === 'n' || e === 'r') return `A quoted ${what} cannot hold a line break. For a break in dialogue or narration, put \`{br}\` in the text line instead.`;
   if (e === 'u' || e === 'x') return 'Type the character itself, e.g. `—` rather than `\\u2014`.';
+  if (hint) return 'Only `\\"`, `\\\'` and `\\\\` are escapes. Write `\\\\` for a backslash.';
   return 'Only `\\"`, `\\\'` and `\\\\` are escapes. Write `\\\\` for a backslash, and `/` between the folders of a path.';
 }
 
@@ -143,7 +222,7 @@ export function parseFile(path, text, opts = {}) {
   const registry = opts.registry && typeof opts.registry.get === 'function' ? opts.registry : null;
   // A UTF-8 byte order mark is not part of the text (browsers drop it too).
   const lines = (text == null ? '' : String(text)).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
-  const file = { path, version: null, header: {}, includes: [], decls: [], scenes: [], diags };
+  const file = { path, version: null, header: {}, includes: [], decls: [], scenes: [], orphans: [], diags };
   const L = lines.map((raw, idx) => {
     const m = /^([ \t]*)(.*?)\s*$/.exec(raw);
     return { raw: raw.replace(/\s+$/, ''), ws: m[1], text: m[2], indent: indentWidth(m[1]), n: idx + 1 };
@@ -157,6 +236,14 @@ export function parseFile(path, text, opts = {}) {
     if (rule) return rule === true || rule(node);
     const def = registry && registry.get(node.name);
     return !!(def && def.props && (!def.declareIf || def.declareIf(node)));
+  }
+
+  // A declaration or `@note`: a command that may stand anywhere.
+  function isDeclaration(n) {
+    if (n.type !== 'cmd') return false;
+    const def = registry && registry.get(n.name);
+    if (def) return !!(def.decl || def.topLevel || (def.declareIf && def.declareIf(n)));
+    return DECL_COMMANDS.has(n.name) || (n.name === 'video' && takesProps(n));
   }
 
   // How many lines of a block, from L[from] on, sit at exactly `depth`: the
@@ -179,11 +266,49 @@ export function parseFile(path, text, opts = {}) {
     return ` The ${k === 1 ? 'line' : k + ' lines'} below it at the same indentation ${k === 1 ? 'has' : 'have'} the same problem.`;
   };
 
-  // For a `key: value` line under a command that takes no property block:
-  // it may be meant as an argument (`@show mio` + `  at: left`).
-  const argNote = (ln, cmd) => {
-    if (RAW_COMMANDS.has(cmd.name)) return '';
+  // The characters this file declares at the top, plus any the caller
+  // passes as opts.characters ([{ id, name }]). The parser uses them to tell
+  // a mistyped dialogue line from narration.
+  let chars = null, charsSeen = -1;
+  function knownCharacters() {
+    if (charsSeen === top.length) return chars;
+    chars = [];
+    for (const c of (opts.characters || [])) if (c && c.id) chars.push({ id: String(c.id), name: c.name ? String(c.name) : null });
+    for (const n of top) {
+      if (n.type !== 'cmd' || n.name !== 'character') continue;
+      const id = n.args.find(a => !a.key);
+      if (!id) continue;
+      const name = n.props.find(pr => pr.key === 'name') || n.args.find(a => a.key === 'name');
+      chars.push({ id: id.value, name: name ? name.value : null });
+    }
+    charsSeen = top.length;
+    return chars;
+  }
+  // The known character whose id (in any case) or display name is `word`.
+  function characterFor(word) {
+    const w = word.toLowerCase();
+    const list = knownCharacters();
+    return list.find(c => c.id.toLowerCase() === w) || list.find(c => c.name && c.name.toLowerCase() === w) || null;
+  }
+  // The id to write for a speaker-like word: a known character's, or the
+  // word itself when it is a lowercase id like `mio` (a capitalised word
+  // before a colon is as likely prose: `Note:`, `Re:`).
+  function speakerId(word) {
+    const c = characterFor(word);
+    return c ? c.id : isLowerId(word) ? word : null;
+  }
+
+  // A `key: value` line under a command that takes no property block may be
+  // meant as an argument (`@show mio` + `  at: left`). Returns its match, or
+  // null for a raw command or when the key is a character (then it is
+  // dialogue).
+  function argLine(ln, cmd) {
+    if (RAW_COMMANDS.has(cmd.name)) return null;
     const m = /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(\S+)$/.exec(ln.text);
+    return m && !characterFor(m[1]) ? m : null;
+  }
+  const argNote = (ln, cmd) => {
+    const m = argLine(ln, cmd);
     return m ? ` If it is meant as an argument, write \`${m[1]}=${m[2]}\` on the \`@${cmd.name}\` line instead.` : '';
   };
 
@@ -282,9 +407,8 @@ export function parseFile(path, text, opts = {}) {
         const at = exprCommentAt(raw);
         if (at >= 0) raw = raw.slice(0, at);
       } else {
-        // @log is free text: an apostrophe there is not a quote
-        const cm = /\s\/\/(?=(?:[^"]*"[^"]*")*[^"]*$)/.exec(raw);
-        if (cm) raw = raw.slice(0, cm.index);
+        const at = logCommentAt(raw);
+        if (at >= 0) raw = raw.slice(0, at);
       }
       node.raw = raw.trim();
       node.rawCol = restCol + 1;
@@ -304,19 +428,22 @@ export function parseFile(path, text, opts = {}) {
     const nodes = [];
     const reported = new Set();
     let prev = null, seen = false;
+    let argCmd = null; // the command over a reported run of indented lines
     while (p < L.length) {
       const ln = L[p];
       if (isSkippable(ln)) { p++; continue; }
       if (ln.indent <= parent) break;
       if (ln.indent === 0 && ln.text.startsWith('#')) break; // next scene
-      if (ln.indent === indent) reported.clear();
+      if (ln.indent === indent) { reported.clear(); argCmd = null; }
       else if (!reported.has(ln.indent)) {
         reported.add(ln.indent);
+        argCmd = null;
         const also = alsoNote(runLength(p, ln.indent, indent, parent));
         if (ln.indent < indent) {
           diags.error('E101', 'This line is indented less than the lines above it but doesn\'t line up with any outer block.', loc(ln), 'Indent with the same number of spaces as the block it belongs to.' + also);
         } else if (prev && prev.type === 'cmd' && !takesProps(prev) && !['if', 'elif', 'else'].includes(prev.name)) {
           diags.error('E102', `Unexpected indentation: \`@${prev.name}\` doesn't take an indented block.`, loc(ln), `Indent this line at the same level as \`@${prev.name}\`.` + argNote(ln, prev) + also);
+          argCmd = prev;
         } else if (prev && prev.type === 'cmd' && takesProps(prev)) {
           diags.error('E102', `Unexpected indentation: this line doesn't line up with the properties of \`@${prev.name}\` above it.`, loc(ln), `Indent it like the other \`key: value\` lines, or at the same level as \`@${prev.name}\`.` + also);
         } else if (parent < 0 && !seen) {
@@ -325,6 +452,9 @@ export function parseFile(path, text, opts = {}) {
           diags.error('E102', 'Unexpected indentation. Only lines under a choice (`* ...`), `@if`/`@elif`/`@else`, or a declaration\'s properties are indented.', loc(ln), 'Remove the extra indentation.' + also);
         }
       }
+      // `@show mio` + `  at: left`: the E102 above names the argument. Read as
+      // dialogue, `at` would also be an unknown speaker (E114), so drop it.
+      if (argCmd && ln.indent > indent && argLine(ln, argCmd)) { p++; seen = true; continue; }
       const node = parseStatement(ln);
       if (node) nodes.push(node);
       prev = node;
@@ -380,25 +510,43 @@ export function parseFile(path, text, opts = {}) {
   const isShortName = (w) => [...w].length <= 8;
 
   // Lines that look like dialogue but don't match its syntax. Returns
-  // { who, why, fix } for a W608, or null.
+  // { who, why, fix } for a W608, or null. The `word：text` and `word:text`
+  // forms are also ordinary prose (`時刻：午後三時。`, `Note:the tide`), so they
+  // get a W608 only when the word is a known character, a lowercase id, or
+  // (before `：`) a name in kana. Otherwise the result has `weak` set and
+  // the line stays narration with no diagnostic.
   function dialogueLookalike(t) {
+    const FULL_WIDTH = '`：` (a full-width colon) doesn\'t start dialogue';
+    const NO_SPACE = 'there is no space after the colon';
     let m = /^([\p{L}\p{M}\p{N}_'’.-]+)\s*((?:[(（][^()（）]*[)）])?)\s*：\s*(\S.*)$/u.exec(t);
-    const isId = m && /^[A-Za-z_][A-Za-z0-9_]*$/.test(m[1]);
-    if (m && (isId || isShortName(m[1]))) {
+    if (m) {
       const attrs = m[2] ? ' ' + m[2].replace('（', '(').replace('）', ')') : '';
-      return { who: m[1], why: '`：` (a full-width colon) doesn\'t start dialogue',
-        fix: isId ? `Write \`${m[1]}${attrs}: ${m[3]}\` with an ASCII colon and a space.` : 'Dialogue is a character id, an ASCII colon and a space: `id: ...` (the id, not the display name).' };
+      const id = speakerId(m[1]);
+      if (id) return { who: m[1], why: FULL_WIDTH, fix: `Write \`${id}${attrs}: ${m[3]}\` with an ASCII colon and a space.` };
+      if (RE_KANA_NAME.test(m[1]) && isShortName(m[1])) return { who: m[1], why: FULL_WIDTH, fix: 'Dialogue is a character id, an ASCII colon and a space: `id: ...` (the id, not the display name).' };
+      return { who: m[1], why: FULL_WIDTH, attrs, text: m[3], weak: true };
     }
-    m = /^([A-Za-z_][A-Za-z0-9_]*)((?:\s*\([^()]*\))?)\s*:(?![\/\d:])(\S.*)$/.exec(t);
-    if (m) return { who: m[1], why: 'there is no space after the colon', fix: `Write \`${m[1]}${m[2]}: ${m[3]}\`.` };
+    m = RE_NO_SPACE_COLON.exec(t);
+    if (m) {
+      const id = speakerId(m[1]);
+      if (id) return { who: m[1], why: NO_SPACE, fix: `Write \`${id}${m[2]}: ${m[3]}\`.` };
+      return { who: m[1], why: NO_SPACE, attrs: m[2], text: m[3], weak: true };
+    }
     m = /^"([^"]+)"((?:\s*\([^()]*\))?)\s*:(\S.*)$/.exec(t);
-    if (m) return { who: m[1], why: 'there is no space after the colon', fix: `Write \`"${m[1]}"${m[2]}: ${m[3]}\`.` };
+    if (m) return { who: m[1], why: NO_SPACE, fix: `Write \`"${m[1]}"${m[2]}: ${m[3]}\`.` };
     m = /^[“”„«「『]([^“”"»」』]+)[”“"»」』]\s*(?:\([^()]*\))?\s*[:：]\s*(\S.*)$/u.exec(t);
     if (m) return { who: m[1], why: 'a one-off speaker\'s name needs straight double quotes', fix: `Write \`"${m[1]}": ${m[2]}\`.` };
-    m = /^([A-Za-z_][A-Za-z0-9_]*)\s+"(.*)"$/.exec(t) || /^"([^"]+)"\s+"(.*)"$/.exec(t);
+    const RENPY = 'this is Ren\'Py-style dialogue';
+    m = /^"([^"]+)"\s+"(.*)"$/.exec(t);
+    if (m) return { who: m[1], why: RENPY, fix: `In Shiori write \`"${m[1]}": ${m[2]}\`.` };
+    m = RE_RENPY.exec(t);
     if (m) {
-      const who = /^"/.test(t) ? `"${m[1]}"` : m[1];
-      return { who: m[1], why: 'this is Ren\'Py-style dialogue', fix: `In Shiori write \`${who}: ${m[2]}\`.` };
+      const c = characterFor(m[1]);
+      const id = c ? c.id : /^[A-Za-z_][A-Za-z0-9_]*$/.test(m[1]) ? m[1] : null;
+      if (id) return { who: m[1], why: RENPY, fix: `In Shiori write \`${id}: ${m[2]}\`.` };
+      // A word in a script written without spaces may be half a sentence.
+      if (RE_UNSPACED_SCRIPT.test(m[1])) return null;
+      return { who: m[1], why: RENPY, fix: `In Shiori write \`"${m[1]}": ${m[2]}\` for a one-off speaker, or \`id: ${m[2]}\` with the id of a declared character.` };
     }
     return null;
   }
@@ -478,9 +626,11 @@ export function parseFile(path, text, opts = {}) {
     const look = dialogueLookalike(t);
     if (m && isShortName(m[1])) {
       // Japanese, Chinese...: no spaces, so only a short "word" looks like a name
-      diags.warn('W608', `This looks like dialogue from "${m[1]}", but it will be shown as narration.`, loc(ln),
-        `Dialogue starts with the character's id (ASCII letters, digits and _), not the display name: declare \`@character id name="${m[1]}"\` and write \`id: ...\`. If it really is narration, start the line with \`| \`.`);
-    } else if (look) {
+      const c = characterFor(m[1]);
+      diags.warn('W608', `This looks like dialogue from "${m[1]}", but it will be shown as narration.`, loc(ln), c
+        ? `Dialogue starts with the character's id, not the display name: write \`${c.id}${m[2] ? ` (${m[2]})` : ''}: ${m[3]}\`. If it really is narration, start the line with \`| \`.`
+        : `Dialogue starts with the character's id (ASCII letters, digits and _), not the display name: declare \`@character id name="${m[1]}"\` and write \`id: ...\`. If it really is narration, start the line with \`| \`.`);
+    } else if (look && !look.weak) {
       diags.warn('W608', `This looks like dialogue from "${look.who}", but ${look.why}, so it will be shown as narration.`, loc(ln),
         `${look.fix} If it really is narration, start the line with \`| \`.`);
     } else if (RE_LOOKS_LIKE_SPEAKER.test(t)) {
@@ -488,7 +638,11 @@ export function parseFile(path, text, opts = {}) {
       diags.warn('W608', `This looks like dialogue from "${who}", but it will be shown as narration.`, loc(ln),
         `For a one-off speaker write \`"${who}": ...\`; for a recurring one declare \`@character\`. If it really is narration, start the line with \`| \`.`);
     }
-    return { type: 'narrate', text: t, loc: loc(ln, col), textCol: col };
+    const node = { type: 'narrate', text: t, loc: loc(ln, col), textCol: col };
+    // `Rin:Hi.` in a chapter file, where the parser can't see `@character rin`:
+    // keep what it saw, so the compiler can check it against every character.
+    if (look && look.weak) node.speakerLike = { who: look.who, why: look.why, attrs: look.attrs, text: look.text };
+    return node;
   }
 
   function parseChoice(ln) {
@@ -502,7 +656,7 @@ export function parseFile(path, text, opts = {}) {
     const mods = {};
     let offset = t.indexOf(s);
     while (s.startsWith('[')) {
-      const close = s.indexOf(']');
+      const close = closeBracketAt(s);
       if (close < 0) { diags.error('E107', 'This `[` is never closed with `]`.', loc(ln, col + offset)); break; }
       const rawInner = s.slice(1, close);
       const inner = rawInner.trim();
@@ -514,13 +668,22 @@ export function parseFile(path, text, opts = {}) {
         mods.once = true;
       } else {
         if (!mm[2]) diags.error('E107', `\`[${mm[1]}]\` needs a condition, e.g. \`[${mm[1]} trust >= 2]\`.`, loc(ln, col + offset));
-        let src = mm[2], hint = null;
-        const hm = mm[1] === 'require' ? /^(.*?)\s+"([^"]*)"\s*$/.exec(src) : null;
-        if (hm) { src = hm[1]; hint = hm[2]; }
         // column of the condition's first character: after `[`, any spaces and the keyword
         const kwAt = rawInner.length - rawInner.trimStart().length;
         const condAt = mm[2] ? rawInner.indexOf(mm[2], kwAt + mm[1].length) : kwAt + mm[1].length;
-        mods[mm[1]] = { src, hint, col: col + offset + 1 + condAt };
+        const condCol = col + offset + 1 + condAt;
+        let src = mm[2], hint = null;
+        // `[require cond "hint"]`: a trailing "string" is the hint only when the
+        // text before it is already a complete condition (as for @assert), so
+        // `[require route == "rin"]` keeps its last operand. The hint follows
+        // the escape rule of quoted arguments.
+        const at = mm[1] === 'require' && !parses(src) ? trailingStringAt(src) : -1;
+        if (at > 0 && parses(src.slice(0, at))) {
+          const r = readQuoted(src, at + 1, (j) => j === src.length - 1, condCol - 1, diags, loc(ln), 'lock hint');
+          src = src.slice(0, at).trimEnd();
+          hint = r.value;
+        }
+        mods[mm[1]] = { src, hint, col: condCol };
       }
       const after = s.slice(close + 1);
       offset += close + 1 + (after.length - after.trimStart().length);
@@ -534,7 +697,38 @@ export function parseFile(path, text, opts = {}) {
     const node = { type: 'option', mods, text: s, target, loc: loc(ln, col), textCol: col + offset, body: [] };
     const ci = childIndent(ln.indent);
     if (ci != null) node.body = parseBlock(ci, ln.indent);
+    else checkOddBody(ln, p - 1);
     return node;
+  }
+
+  // A choice's lines indented with no-break or full-width spaces are not
+  // under it: those spaces are not indentation, so the lines end the menu.
+  // parseStatement reports such a line when it is a command, choice, jump or
+  // dialogue; narration is reported here, where it can only be meant as the
+  // choice's body. A U+3000 is also a Japanese paragraph indent, so after the
+  // last choice of a menu it is reported only when the choice above had such
+  // a body too. `at` is the index of the choice's line.
+  let oddBody = null; // { indent, next }: the last run reported, and the line after it
+  function checkOddBody(ln, at) {
+    let q = p;
+    while (q < L.length && isSkippable(L[q])) q++;
+    const first = L[q];
+    const odd = first && first.indent === ln.indent && RE_ODD_SPACE.exec(first.text);
+    if (!odd || first.text.length === odd[0].length) return;
+    const isNarration = (c) => { const rest = c.text.replace(RE_ODD_SPACE, ''); return !RE_ODD_STATEMENT.test(rest) && !RE_DIALOGUE.test(rest) && !RE_ADHOC.test(rest); };
+    if (!isNarration(first)) return;
+    let r = q, n = 0;
+    while (r < L.length && (isSkippable(L[r]) || (L[r].indent === ln.indent && RE_ODD_SPACE.test(L[r].text)))) {
+      if (!isSkippable(L[r]) && isNarration(L[r])) n++;
+      r++;
+    }
+    const next = L[r];
+    const menuGoesOn = !!next && next.indent === ln.indent && next.text.startsWith('*');
+    const afterOddBody = !!oddBody && oddBody.indent === ln.indent && oddBody.next === at;
+    if (/^\u3000+$/.test(odd[0]) && !menuGoesOn && !afterOddBody) return;
+    diags.error('E101', 'This line starts with a non-breaking or full-width space, which is not indentation.', loc(first),
+      'To put it under the choice above, indent it with ASCII spaces or tabs.' + alsoNote(n));
+    oddBody = { indent: ln.indent, next: r };
   }
 
   function splitAttrs(s) {
@@ -592,12 +786,19 @@ export function parseFile(path, text, opts = {}) {
       if (!m || !isLabelId(m[1]) || ln.text.startsWith('##')) {
         diags.error('E104', 'A scene starts with `# scene_id`, optionally followed by a title in quotes: `# harbor "The Harbor"`.', loc(ln),
           'Scene ids use letters, digits, `_` and `.`, and start with a letter. If this line is narration, start it with `| `.');
-        // Read the lines under the bad heading as part of the scene above
-        // instead of reporting each one; before the first scene, keep only
-        // its declarations.
+        // The lines under a bad heading belong to no scene. Parse them, so
+        // their syntax is checked, but compile them only where they would
+        // run anyway: when the scene above runs on into them, they join it.
+        // After a scene that always jumps away they would be dead code
+        // (W622), so keep only their declarations, which apply wherever
+        // they stand; before the first scene, the same. The rest goes to
+        // file.orphans, for a compiler that wants to check it.
         const body = parseBlock(0, -1);
-        if (scene) scene.body = scene.body.concat(body);
-        else top.push(...body.filter(n => n.type === 'cmd'));
+        if (scene && !scene.body.some(alwaysLeaves)) { scene.body = scene.body.concat(body); continue; }
+        const keep = body.filter(isDeclaration), rest = body.filter(n => !isDeclaration(n));
+        if (scene) scene.body = scene.body.concat(keep);
+        else top.push(...keep);
+        if (rest.length) file.orphans.push({ loc: loc(ln, 1), body: rest });
         continue;
       }
       const args = tokenizeArgs(m[2], ln.text.indexOf(m[2]), diags, loc(ln));
