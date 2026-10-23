@@ -1,10 +1,12 @@
 // shiori — command-line tools for Shiori visual novels.
 // Run through bin/shiori (uses Node.js if installed, else macOS JavaScriptCore).
+// Tests set globalThis.__shioriEmbedded before importing and call runCli(host).
 
 import { createHost } from './host.js';
 import { prepareProject } from '../engine/core/compiler.js';
 import { VM } from '../engine/core/vm.js';
 import { defaultRegistry } from '../engine/core/modules/index.js';
+import { checkValue } from '../engine/core/registry.js';
 import { formatDiagnostic, summary, CODES, CODE_HELP } from '../engine/core/diagnostics.js';
 import { analyze, toMermaid, toDot, LENGTH_CATEGORIES } from '../engine/core/analyze.js';
 import { explore, formatPath, choiceList, replayArgs } from '../engine/core/explore.js';
@@ -58,63 +60,205 @@ Commands
 Options for every command: --json (machine-readable output)
 `;
 
-const host = await createHost(typeof arguments !== 'undefined' ? arguments : undefined);
+let host = null;
+let jsonMode = false;
 const out = (s = '') => host.print(s);
 
+// ------------------------------------------------------------------ options
+
+// The options each command accepts. Boolean flags stand alone; value flags take
+// the next argument (or --flag=value). Every command also takes --json and --help.
+const COMMON = ['json', 'help'];
+const OPTIONS = {
+  check: { bool: ['assets', 'strict'] },
+  play: { bool: ['state', 'quiet'], value: ['choices', 'from', 'set', 'seen', 'game', 'rolls', 'seed', 'max', 'game-result'] },
+  explore: { value: ['max-states', 'seen', 'set'] },
+  graph: { value: ['format'] },
+  stats: { bool: ['by-scene'] },
+  assets: {},
+  vndb: { bool: ['no-explore'], value: ['max-states'] },
+  docs: { value: ['game'] },
+  explain: {},
+  help: {},
+};
+// Names people reach for that "did you mean" can't guess (scene= is the browser's URL parameter).
+const ALIASES = { scene: 'from', start: 'from', choice: 'choices', ending: 'seen', endings: 'seen', var: 'set', vars: 'set', variable: 'set', result: 'game', results: 'game', roll: 'rolls', 'max-lines': 'max', steps: 'max-states' };
+const VALUE_HELP = {
+  choices: '--choices 1,2,1', from: '--from <scene>', set: '--set name=value', seen: '--seen <ending>,…', game: '--game <id>=<result>',
+  rolls: '--rolls 3,true,…', seed: '--seed <n>', max: '--max <n>', 'max-states': '--max-states <n>', format: '--format mermaid|dot|json',
+  'game-result': '--game-result <result>',
+};
+const valueHelp = (cmd, k) => cmd === 'docs' && k === 'game' ? '--game <folder>' : VALUE_HELP[k] || `--${k} <value>`;
+const wholeNumber = (v) => /^\d+$/.test(v) && Number(v) > 0 ? null : 'a whole number above 0';
+const VALUE_CHECKS = {
+  max: wholeNumber,
+  'max-states': wholeNumber,
+  seed: (v) => v.trim() !== '' && Number.isFinite(Number(v)) ? null : 'a number',
+  format: (v) => ['mermaid', 'dot', 'json'].includes(v) ? null : 'mermaid, dot or json',
+};
 const LIST_FLAGS = new Set(['seen', 'set', 'choices', 'game', 'rolls']);
+// What the one positional argument after the command is.
+const POSITIONAL = { docs: 'name', explain: 'code', help: null };
+
+function usageError(message, hint) { return { error: { message, hint } }; }
+
+export function parseArgs(args, cmdHint) {
+  const o = { _: [] };
+  // The command decides which options exist: it is the first word that is not an option.
+  const cmd = cmdHint !== undefined ? cmdHint : args.find(a => !a.startsWith('-'));
+  const spec = OPTIONS[cmd];
+  const bool = new Set(COMMON.concat(spec && spec.bool || []));
+  const value = new Set(spec && spec.value || []);
+  const known = [...bool, ...value];
+  let rest = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (rest || !a.startsWith('-') || a === '-') { o._.push(a); continue; }
+    if (a === '--') { rest = true; continue; }
+    if (a === '-h') { o.help = true; continue; }
+    if (!a.startsWith('--')) {
+      if (spec) return usageError(`Unknown option \`${a}\` for \`shiori ${cmd}\`.`, `Options start with two dashes. Options for ${cmd}: ${known.map(k => '--' + k).join(' ')}.`);
+      o._.push(a); continue;
+    }
+    const eq = a.indexOf('=');
+    const k = eq > 0 ? a.slice(2, eq) : a.slice(2);
+    let v;
+    if (!spec) { v = eq > 0 ? a.slice(eq + 1) : true; }         // unknown command: main reports it
+    else if (bool.has(k)) {
+      if (eq > 0) return usageError(`\`--${k}\` takes no value.`, `Write just \`--${k}\`.`);
+      v = true;
+    } else if (value.has(k)) {
+      if (eq > 0) v = a.slice(eq + 1);
+      else if (i + 1 < args.length && !args[i + 1].startsWith('--')) v = args[++i];
+      else return usageError(`\`--${k}\` needs a value.`, `Write \`${valueHelp(cmd, k)}\`.`);
+      if (v === '') return usageError(`\`--${k}\` needs a value.`, `Write \`${valueHelp(cmd, k)}\`.`);
+      const bad = VALUE_CHECKS[k] && VALUE_CHECKS[k](v);
+      if (bad) return usageError(`\`--${k} ${v}\` is not valid: ${k === 'format' ? 'use' : 'it takes'} ${bad}.`, `Write \`${valueHelp(cmd, k)}\`.`);
+    } else {
+      const m = ALIASES[k] && known.includes(ALIASES[k]) ? ALIASES[k] : didYouMean(k, known);
+      const elsewhere = Object.keys(OPTIONS).filter(c => c !== cmd && [...(OPTIONS[c].bool || []), ...(OPTIONS[c].value || [])].includes(k));
+      const hint = m ? `Did you mean \`--${m}\`?` : elsewhere.length ? `\`--${k}\` is an option of \`shiori ${elsewhere.join('`, `shiori ')}\`.` : `Options for ${cmd}: ${known.map(x => '--' + x).join(' ')}.`;
+      return usageError(`Unknown option \`--${k}\` for \`shiori ${cmd}\`.`, hint);
+    }
+    // List flags add up when repeated.
+    if (LIST_FLAGS.has(k) && typeof o[k] === 'string' && typeof v === 'string') o[k] += ',' + v;
+    else o[k] = v;
+  }
+  if (spec && cmd !== 'help') {
+    const extra = o._.slice(2);
+    if (extra.length) {
+      const what = POSITIONAL[cmd] || 'game folder';
+      const x = extra[0];
+      const hint = cmd === 'play' && /^\d+(,\d+)*$/.test(x) ? `Did you mean \`--choices ${x}\`?` : `\`shiori ${cmd}\` takes one ${what}; options start with --.`;
+      return usageError(`Unexpected argument \`${x}\`.`, hint);
+    }
+  }
+  return { o };
+}
+
+// Quote a word for pasting into a shell, only when it needs it.
+export function shq(s) {
+  s = String(s);
+  return /^[A-Za-z0-9_.\/@%+=:,-]+$/.test(s) ? s : "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
+// "TypeError: message" and the stack. JavaScriptCore's stack has only the frames.
+export function describeError(e) {
+  if (!e || typeof e !== 'object') return String(e);
+  const head = e.message !== undefined ? `${e.name || 'Error'}: ${e.message}` : String(e);
+  const st = e.stack ? String(e.stack) : '';
+  return !st ? head : st.startsWith(head) ? st : head + '\n' + st;
+}
+
+// One error, as text or (with --json) as {ok: false, error}. Ends the command.
+function fail(message, { hint, code, exit = 1, extra } = {}) {
+  if (jsonMode) out(JSON.stringify({ ok: false, error: { ...(code ? { code } : {}), message, ...(hint ? { hint } : {}) }, ...(extra || {}) }, null, 2));
+  else { out(message); if (hint) out(`  hint: ${hint}`); }
+  host.exit(exit);
+}
 
 // --seen / --set as a starting persistent store (and plain variables for play).
-function startData(o, program) {
+function startData(o, program, { forExplore = false } = {}) {
   const persistent = { endings: {}, vars: {} };
   const vars = {};
   const problems = [];
-  if (o.seen) for (const id of String(o.seen).split(',').filter(Boolean)) {
+  if (o.seen) for (const raw of String(o.seen).split(',')) {
+    const id = raw.trim();
+    if (!id) continue;
     if (!program.decls.endings[id]) { const m = didYouMean(id, Object.keys(program.decls.endings)); problems.push(`Unknown ending \`${id}\` in --seen.${m ? ` Did you mean \`${m}\`?` : ''}`); continue; }
     persistent.endings[id] = { title: program.decls.endings[id].title, kind: program.decls.endings[id].kind, first: 0, count: 1 };
   }
-  if (o.set) for (const kv of String(o.set).split(',').filter(Boolean)) {
-    const [k, ...rest] = kv.split('='); const raw = rest.join('=');
+  if (o.set) for (const kv of String(o.set).split(',')) {
+    if (!kv.trim()) continue;
+    const eq = kv.indexOf('=');
+    const k = (eq < 0 ? kv : kv.slice(0, eq)).trim();
     const d = program.decls.vars[k];
     if (!d) { const m = didYouMean(k, Object.keys(program.decls.vars)); problems.push(`Unknown variable \`${k}\` in --set.${m ? ` Did you mean \`${m}\`?` : ''}`); continue; }
-    const v = d.type === 'number' ? Number(raw) : d.type === 'bool' ? raw === 'true' : raw;
-    if (d.persistent) persistent.vars[k] = v; else vars[k] = v;
+    const example = d.type === 'number' ? '3' : d.type === 'bool' ? 'true' : 'text';
+    if (eq < 0) { problems.push(`\`--set ${k}\` needs a value: --set ${k}=${example}`); continue; }
+    const raw = kv.slice(eq + 1).trim();
+    // The same conversion as a script argument: numbers must be numbers, true/false (or yes/no, on/off, 1/0).
+    const c = d.type === 'number' || d.type === 'bool' ? checkValue(d.type, raw) : { value: raw };
+    if (c.error) { problems.push(`\`--set ${k}=${raw}\`: \`${k}\` is a ${d.type === 'bool' ? 'true/false variable, so the value must be true or false' : 'number variable, so the value must be a number'}.`); continue; }
+    if (forExplore && !d.persistent) { problems.push(`\`--set ${k}\`: \`${k}\` is not @persistent. explore starts every route at the beginning, so its --set only takes @persistent variables (use \`shiori play --set\` for others).`); continue; }
+    if (d.persistent) persistent.vars[k] = c.value; else vars[k] = c.value;
   }
   return { persistent, vars, problems };
 }
 
-function parseArgs(args) {
-  const o = { _: [] };
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a.startsWith('--')) {
-      const eq = a.indexOf('=');
-      let k, v;
-      if (eq > 0) { k = a.slice(2, eq); v = a.slice(eq + 1); }
-      else if (i + 1 < args.length && !args[i + 1].startsWith('--') && !['json', 'quiet', 'state', 'strict', 'no-explore', 'all', 'random', 'interactive', 'assets', 'by-scene'].includes(a.slice(2))) { k = a.slice(2); v = args[++i]; }
-      else { k = a.slice(2); v = true; }
-      // List flags add up when repeated.
-      if (LIST_FLAGS.has(k) && typeof o[k] === 'string' && typeof v === 'string') o[k] += ',' + v;
-      else o[k] = v;
-    } else o._.push(a);
+// ------------------------------------------------------------------ loading
+
+// The folder must exist and hold game.story. Returns a diagnostic, or null.
+function folderProblem(base, join) {
+  if (host.exists(join('game.story'))) return null;
+  const isDir = base === '.' ? true : host.isDir(base);
+  if (isDir === false) {
+    const slash = base.lastIndexOf('/');
+    const parent = slash > 0 ? base.slice(0, slash) : slash === 0 ? '/' : '.';
+    const m = didYouMean(base.slice(slash + 1), (host.subdirs && host.subdirs(parent)) || []);
+    const hint = m ? `Did you mean \`${parent === '.' ? m : parent.replace(/\/$/, '') + '/' + m}\`?`
+      : /\.story$/.test(base) ? 'Pass the folder that holds game.story, not the file: `shiori check games/my-game`.'
+      : 'Pass the folder that holds game.story, e.g. `shiori check examples/lantern-keeper`.';
+    return { severity: 'error', code: 'E113', message: `No folder \`${base}\`.`, hint };
   }
-  return o;
+  return { severity: 'error', code: 'E113', message: base === '.' ? 'The current folder has no game.story.' : `\`${base}\` has no game.story.`,
+    hint: 'Every game starts from a game.story file in its folder. Pass the folder that holds it (e.g. `shiori check examples/lantern-keeper`), or start a game with `shiori new games/my-game`.' };
 }
 
 async function load(dir, opts = {}) {
-  const base = dir.replace(/\/+$/, '') || '.';
-  if (host.setListingRoot) host.setListingRoot(base);
+  const base = String(dir).replace(/(.)\/+$/, '$1') || '.';
   const join = (p) => base === '.' ? p : base + '/' + p;
-  const res = await prepareProject({
-    readText: (p) => host.read(join(p)),
-    importModule: (p) => import(host.moduleUrl(join(p))),
-    listing: host.list(base),
-  });
+  const problem = folderProblem(base, join);
+  if (problem) return { base, program: null, diagnostics: [problem], registry: defaultRegistry(), noGame: true };
+  const read = new Set();
+  const readText = (p) => { const t = host.read(join(p)); if (t != null) read.add(p); return t; };
+  const importModule = (p) => import(host.moduleUrl(join(p)));
+  let listing = host.list(base);
+  let res = await prepareProject({ readText, importModule, listing });
+  // A listed file that was included under another name (./story/a.story, or
+  // through a symlinked folder) is not "in the folder but not included" (W605).
+  if (listing && host.fileId) {
+    const ids = new Set([...read].map(p => host.fileId(join(p))).filter(Boolean));
+    const kept = listing.filter(p => read.has(p) || !ids.has(host.fileId(join(p))));
+    if (kept.length < listing.length) { listing = kept; res = await prepareProject({ readText, importModule, listing }); }
+  }
   if (!opts.skipAssets && res.program) {
-    res.diagnostics.push(...checkAssets(res.program, (p) => host.exists(join(p))));
+    const missing = new Set();
+    res.diagnostics.push(...checkAssets(res.program, (p) => { const ok = host.exists(join(p)); if (!ok) missing.add(p); return ok; }));
+    res.missingFiles = [...missing];
     res.diagnostics.push(...await checkLmn(res.program, (p) => host.read(join(p))));
   }
   res.base = base;
   return res;
+}
+
+// The first line of an LMN text that is not blank, a // comment or a ``` fence.
+function lmnFirstLine(text) {
+  for (const l of text.split('\n')) {
+    const t = l.trim();
+    if (t && !t.startsWith('//') && !t.startsWith('```')) return t;
+  }
+  return '';
 }
 
 // Compile every LMN song the game declares and report its problems.
@@ -123,14 +267,20 @@ async function checkLmn(program, read) {
   if (!songs.length) return [];
   if (!globalThis.LMN) { try { await import('../engine/vendor/lmn/lmn-core.js'); } catch (e) { return []; } }
   const out = [];
+  const hint = (a) => `In the song for \`${a.id}\`. See engine/vendor/lmn/LMN-Spec.md.`;
   for (const a of songs) {
     const text = read(a.path);
     if (text == null) continue;
-    if (!/^\s*LMN\s+1\b/.test(text)) { out.push({ severity: 'error', code: 'E303', message: `\`${a.id}\`: ${a.path} is not an LMN song (its first line must be \`LMN 1\`).`, file: a.loc.file, line: a.loc.line }); continue; }
     let song;
-    try { song = globalThis.LMN.compile(text); } catch (e) { out.push({ severity: 'error', code: 'E303', message: `\`${a.id}\`: LMN could not compile ${a.path}: ${e.message}`, file: a.loc.file, line: a.loc.line }); continue; }
-    for (const d of song.diagnostics || []) {
-      out.push({ severity: d.level === 'error' ? 'error' : 'warning', code: d.level === 'error' ? 'E303' : 'W617', message: `LMN: ${d.message}`, file: a.path, line: d.line, hint: `In the song for \`${a.id}\`. See engine/vendor/lmn/LMN-Spec.md.` });
+    try { song = globalThis.LMN.compile(text); } catch (e) { out.push({ severity: 'error', code: 'E303', message: `\`${a.id}\`: LMN could not compile ${a.path}: ${e && e.message || e}`, file: a.loc.file, line: a.loc.line }); continue; }
+    // A .lmn file is a song by its extension; a .txt one says so in its version line.
+    if (/\.txt$/i.test(a.path) && !/^LMN\s+1\b/.test(lmnFirstLine(text))) {
+      if (!song || !song.events || !song.events.length) { out.push({ severity: 'error', code: 'E303', message: `\`${a.id}\`: ${a.path} is not an LMN song (a .txt song starts with the line \`LMN 1\`).`, file: a.loc.file, line: a.loc.line, hint: 'Rename it to .lmn, or add `LMN 1` as its first line.' }); continue; }
+      out.push({ severity: 'warning', code: 'W617', message: `\`${a.id}\`: ${a.path} does not start with \`LMN 1\`; a .txt file is an LMN song only with that line.`, file: a.path, line: 1, hint: 'Add `LMN 1` as its first line (comments may come before it), or rename the file to .lmn.' });
+    }
+    for (const d of (song && song.diagnostics) || []) {
+      const severity = d.level === 'error' ? 'error' : d.level === 'info' ? 'info' : 'warning';
+      out.push({ severity, code: severity === 'error' ? 'E303' : 'W617', message: `LMN: ${d.message}`, file: a.path, line: d.line, hint: hint(a) });
     }
   }
   return out;
@@ -147,7 +297,7 @@ function failIfErrors(res, json) {
   if (json) out(JSON.stringify({ ok: false, diagnostics: errs }, null, 2));
   else {
     printDiagnostics(errs, false);
-    out(`The game has ${summary(errs)}. Fix them first (run \`shiori check\` for warnings too).`);
+    if (!res.noGame) out(`The game has ${summary(errs)}. Fix them first (run \`shiori check\` for warnings too).`);
   }
   host.exit(1);
   return true;
@@ -157,8 +307,18 @@ function failIfErrors(res, json) {
 
 async function cmdCheck(o) {
   const res = await load(o._[0] || '.');
+  if (res.noGame) {
+    if (o.json) out(JSON.stringify({ ok: false, summary: summary(res.diagnostics), diagnostics: res.diagnostics }, null, 2));
+    else printDiagnostics(res.diagnostics, false);
+    host.exit(1);
+    return;
+  }
   if (res.program && !res.diagnostics.some(d => d.severity === 'error')) {
     const a = analyze(res.program);
+    for (const id of a.unreachableScenes) {
+      const s = res.program.scenes[id] || {};
+      res.diagnostics.push({ severity: 'warning', code: 'W600', message: `Scene \`${id}\` is never reached: no jump, choice or fall-through leads to it.`, file: s.file, line: s.line, hint: `Add \`-> ${id}\` (or a choice that leads to it) where it should happen, or delete the scene.` });
+    }
     for (const r of a.staticRuns) res.diagnostics.push({ severity: 'warning', code: 'W616', message: `${r.length} lines in a row with no visual change (no expression, movement, camera or effect).`, file: r.loc && r.loc.file, line: r.loc && r.loc.line, hint: 'Readers notice static sprites. Change an expression (`mio (sad): ...`), move someone, or use @camera / @weather / @cg.' });
     for (const r of a.longAdvLines) res.diagnostics.push({ severity: 'warning', code: 'W619', message: `This ADV line is ${r.length} characters; the textbox fits about 250.`, file: r.loc && r.loc.file, line: r.loc && r.loc.line, hint: 'Split it into two lines (each line is one click), or use @mode nvl for long prose.' });
     for (const r of a.dialogueRuns) res.diagnostics.push({ severity: 'warning', code: 'W614', message: `${r.length} lines of dialogue in a row with no narration.`, file: r.loc && r.loc.file, line: r.loc && r.loc.line, hint: 'Add narration between lines: gestures, setting, thoughts. VNDB requires real novel narration, not dialogue alone.' });
@@ -176,10 +336,11 @@ async function cmdCheck(o) {
   }
   let list = res.diagnostics;
   // Missing art/music is normal while writing: group it unless --assets.
-  const missing = list.filter(d => d.code === 'W602' && !/^LMN/.test(d.message));
+  const missing = list.filter(d => d.code === 'W602');
   if (missing.length > 3 && !o.assets && !o.json) {
+    const files = res.missingFiles && res.missingFiles.length ? res.missingFiles : missing.map(d => d.message);
     list = list.filter(d => !missing.includes(d));
-    list.push({ severity: 'warning', code: 'W602', message: `${missing.length} declared asset files don't exist yet (${missing.slice(0, 3).map(d => (/: (\S+)$/.exec(d.message) || /\((.*?)[,)]/.exec(d.message) || [])[1] || '?').join(', ')}, …).`, hint: 'That is fine while the art and music are being made. `shiori check --assets` lists them; `shiori assets` shows where each one is used.' });
+    list.push({ severity: 'warning', code: 'W602', message: `${files.length} declared asset files don't exist yet (${files.slice(0, 3).join(', ')}${files.length > 3 ? ', …' : ''}).`, hint: 'That is fine while the art and music are being made. `shiori check --assets` lists them; `shiori assets` shows where each one is used.' });
   }
   if (o.json) {
     out(JSON.stringify({ ok: !res.diagnostics.some(d => d.severity === 'error'), summary: summary(res.diagnostics), diagnostics: list }, null, 2));
@@ -239,49 +400,107 @@ function pos(x) {
   return names[x] || String(x);
 }
 
+// --rolls 3,true,… : numbers for random(), true/false for chance().
+function parseRolls(raw, problems) {
+  if (!raw) return null;
+  const rolls = [];
+  for (const x of String(raw).split(',').map(s => s.trim()).filter(Boolean)) {
+    if (x === 'true' || x === 'false') rolls.push(x === 'true');
+    else if (Number.isFinite(Number(x))) rolls.push(Number(x));
+    else problems.push(`\`--rolls ${x}\`: each roll is a number (for random()) or true/false (for chance()).`);
+  }
+  return rolls;
+}
+
+// --game id=result,… : a queue of results per gameplay id.
+function parseGames(raw, program, problems) {
+  const queue = {};
+  if (typeof raw !== 'string') return queue;
+  const games = Object.values(program.decls.assets).filter(a => a.kind === 'gameplay');
+  for (const kv of raw.split(',').map(s => s.trim()).filter(Boolean)) {
+    const eq = kv.indexOf('=');
+    const k = (eq < 0 ? kv : kv.slice(0, eq)).trim(), v = eq < 0 ? '' : kv.slice(eq + 1).trim();
+    const g = games.find(a => a.id === k);
+    if (!g) { const m = didYouMean(k, games.map(a => a.id)); problems.push(`Unknown gameplay \`${k}\` in --game.${m ? ` Did you mean \`${m}\`?` : games.length ? ` Declared: ${games.map(a => a.id).join(', ')}.` : ' The game declares no @gameplay.'}`); continue; }
+    const results = Array.isArray(g.opts.results) ? g.opts.results : null;
+    if (!v) { problems.push(`\`--game ${k}\` needs a result: --game ${k}=${results ? results[0] : 'win'}`); continue; }
+    if (results && results.length && !results.includes(v)) {
+      const m = didYouMean(v, results);
+      problems.push(`\`--game ${k}=${v}\`: \`${k}\` declares the results ${results.join(', ')}.${m ? ` Did you mean \`${m}\`?` : ` If the module can return \`${v}\`, add it to \`results=\` of @gameplay ${k}.`}`);
+      continue;
+    }
+    (queue[k] = queue[k] || []).push(v);
+  }
+  return queue;
+}
+
+// Stops (@wait, @pause, @game, @chapter, @video...) in a row without a line or a
+// choice before play gives up: a loop the reader could never leave.
+const STALL_LIMIT = 1000;
+const STALL_SHOWN = 20;
+
 async function cmdPlay(o) {
   const res = await load(o._[0] || '.', { skipAssets: true });
   if (failIfErrors(res, o.json)) return;
   const program = res.program;
   const { persistent, vars, problems } = startData(o, program);
-  if (problems.length) { out(problems.join('\n')); host.exit(1); return; }
-  const vm = new VM(program, { registry: res.registry, seed: o.seed != null ? Number(o.seed) : 1, maxHistory: 0, persistent });
-  // Scripted random outcomes and gameplay results.
-  const rolls = o.rolls ? String(o.rolls).split(',').filter(x => x !== '').map(x => x === 'true' ? true : x === 'false' ? false : Number(x)) : null;
-  if (rolls) { let ri = 0; vm.randomHook = (kind, a, b) => { if (ri < rolls.length) return rolls[ri++]; return kind === 'chance' ? false : a; }; }
-  const gameQueue = {};
-  if (typeof o.game === 'string') for (const kv of o.game.split(',').filter(Boolean)) { const [k, v] = kv.split('='); (gameQueue[k] = gameQueue[k] || []).push(v); }
+  const rolls = parseRolls(o.rolls, problems);
+  const gameQueue = parseGames(o.game, program, problems);
   if (o.from && !program.labels[o.from]) {
     const m = didYouMean(o.from, program.sceneOrder);
-    out(`Unknown scene \`${o.from}\`.${m ? ` Did you mean \`${m}\`?` : ''}`); host.exit(1); return;
+    problems.push(`Unknown scene \`${o.from}\` in --from.${m ? ` Did you mean \`${m}\`?` : ''}`);
   }
+  if (problems.length) return fail(problems.join('\n'));
+  const seed = o.seed != null ? Number(o.seed) : 1;
+  const vm = new VM(program, { registry: res.registry, seed, maxHistory: 0, persistent });
+  // Scripted random outcomes and gameplay results.
+  if (rolls) { let ri = 0; vm.randomHook = (kind, a, b) => { if (ri < rolls.length) return rolls[ri++]; return kind === 'chance' ? false : a; }; }
   const choices = o.choices ? String(o.choices).split(',').map(s => s.trim()).filter(Boolean) : [];
   const taken = [];
   const max = o.max ? Number(o.max) : 5000;
   const json = [];
-  let lines = 0;
-  let r = vm.start(o.from || null, { vars, seed: o.seed != null ? Number(o.seed) : 1 });
+  // stall: stops since the last line or choice; stallGame: an @game in that stretch that got its default result.
+  let lines = 0, stall = 0, stop = null, stallGame = null;
+  let r = vm.start(o.from || null, { vars, seed });
   const emit = (obj, text) => { if (o.json) json.push(obj); else if (text != null) out(text); };
+  const quiet = () => stall > STALL_SHOWN;
   for (;;) {
+    const h = r.halt;
+    if (h.type === 'say' || h.type === 'menu' || h.type === 'input') { stall = 0; stallGame = null; }
+    else if (h.type !== 'end' && h.type !== 'error') stall++;
+    if (stall === STALL_SHOWN + 1) emit({ type: 'note', message: `${STALL_SHOWN} stops in a row without a line; the next ones are not shown until a line or a choice` }, `  · … (${STALL_SHOWN} stops in a row without a line; the next ones are not shown until a line or a choice)`);
     for (const e of r.effects) {
       if (e.type === 'restore') continue;
+      if (quiet() && e.type !== 'error') continue;
       if (e.type === 'scene') { emit({ type: 'scene', id: e.id, title: e.title }, `\n── ${e.id}${e.title ? ' "' + e.title + '"' : ''} ──`); continue; }
       const f = fmtEffect(e, program);
       if (f && (!o.quiet || e.type === 'error' || e.type === 'log')) emit({ type: 'effect', effect: e }, `  · ${f}`);
     }
-    const h = r.halt;
+    if (stall > STALL_LIMIT) {
+      const ins = program.code[vm.state.pc - 1];
+      const loc = ins && ins.loc;
+      const what = h.type === 'game' ? `@game ${h.id}` : '@' + h.type;
+      const message = `The story looped ${STALL_LIMIT} times without showing a line or a choice (it keeps stopping at ${what}${loc ? ` in ${loc.file}:${loc.line}` : ''}).`;
+      const hint = stallGame
+        ? `Every @game ${stallGame.id} got the first declared result "${stallGame.value}". Give the results in order, e.g. --game ${stallGame.id}=${stallGame.others[0]}.`
+        : 'A loop of jumps that only passes @wait, @pause, @game, @chapter or @video never lets the reader out. Add a line or a choice to it, or a way out.';
+      emit({ type: 'error', code: 'R703', message, hint, loc }, `\nERROR R703: ${message}\n  hint: ${hint}`);
+      host.exit(1);
+      stop = 'error';
+      break;
+    }
     if (h.type === 'say') {
       lines++;
       const text = h.name ? `${h.name}${Object.keys(h.attrs || {}).length && !o.quiet ? ' (' + Object.values(h.attrs).join(', ') + ')' : ''}: ${h.plain}` : h.plain;
-      emit({ type: 'say', who: h.who, name: h.name, text: h.plain, id: h.id, loc: h.loc, mode: h.mode }, (h.mode === 'nvl' ? '¶ ' : '') + text);
-      if (o.state) emit(null, '    stage: ' + JSON.stringify(stageSummary(vm.state.stage)));
-      if (lines >= max) { emit({ type: 'stopped', reason: 'max' }, `\n(stopped after ${max} lines)`); break; }
+      const stage = o.state ? stageSummary(vm.state.stage) : null;
+      emit({ type: 'say', who: h.who, name: h.name, text: h.plain, id: h.id, loc: h.loc, mode: h.mode, ...(stage ? { stage } : {}) }, (h.mode === 'nvl' ? '¶ ' : '') + text);
+      if (stage && !o.json) out('    stage: ' + JSON.stringify(stage));
+      if (lines >= max) { emit({ type: 'stopped', reason: 'max' }, `\n(stopped after ${max} lines)`); stop = 'max'; break; }
       r = vm.advance();
       continue;
     }
     if (h.type === 'menu') {
       const ins = program.code[h.pc];
-      const shown = new Set(h.options.map(x => x.index));
       emit({ type: 'menu', options: h.options.map(x => ({ n: x.index + 1, text: x.plain, locked: x.disabled })) }, '? Choose:');
       if (!o.json) {
         ins.options.forEach((opt, i) => {
@@ -299,6 +518,7 @@ async function cmdPlay(o) {
         const so = taken.length ? taken.join(',') + ',' : '';
         emit({ type: 'stopped', reason: 'choice', available: avail, rerun: `--choices ${so}<n>` },
           `\nStopped at a choice. To continue, rerun with --choices ${so}<n>  (n = ${avail.join(' or ')})`);
+        stop = 'choice';
         break;
       }
       const c = choices.shift();
@@ -307,6 +527,7 @@ async function cmdPlay(o) {
       if (!sh || sh.disabled) {
         emit({ type: 'error', message: `Choice ${c} is not available here.` }, `Choice ${c} is not available here (available: ${h.options.filter(x => !x.disabled).map(x => x.index + 1).join(', ')}).`);
         host.exit(1);
+        stop = 'bad-choice';
         break;
       }
       taken.push(n);
@@ -317,11 +538,13 @@ async function cmdPlay(o) {
     if (h.type === 'end') {
       const e = h.ending ? program.decls.endings[h.ending] : null;
       emit({ type: 'end', ending: h.ending }, `\n■ END${e ? ` — ending "${e.title}" (${e.kind})` : ''}`);
+      stop = 'end';
       break;
     }
     if (h.type === 'error') {
       emit({ type: 'error', code: h.code, message: h.message, loc: h.loc }, `\nERROR ${h.code}: ${h.message}${h.loc ? ` (${h.loc.file}:${h.loc.line})` : ''}`);
       host.exit(1);
+      stop = 'error';
       break;
     }
     if (h.type === 'input') {
@@ -334,18 +557,32 @@ async function cmdPlay(o) {
       const q = gameQueue[h.id];
       const scripted = q && q.length ? q.shift() : (o['game-result'] != null ? o['game-result'] : undefined);
       const v = scripted !== undefined ? scripted : (h.results && h.results[0]) || null;
-      emit({ type: 'game', id: h.id, result: v }, `  · gameplay ${h.id} → ${v}${scripted === undefined && h.results && h.results.length > 1 ? `  (first declared result; try --game ${h.id}=${h.results[1]})` : ''}`);
+      if (scripted === undefined && h.results && h.results.length > 1) stallGame = { id: h.id, value: v, others: h.results.filter(x => x !== v) };
+      if (!quiet()) emit({ type: 'game', id: h.id, result: v }, `  · gameplay ${h.id} → ${v}${scripted === undefined && h.results && h.results.length > 1 ? `  (first declared result; try --game ${h.id}=${h.results[1]})` : ''}`);
       r = vm.submit(v);
       continue;
     }
-    if (h.type === 'chapter') emit({ type: 'chapter', title: h.title }, `\n=== ${h.title}${h.subtitle ? ' — ' + h.subtitle : ''} ===`);
     if (h.type === 'ending') emit({ type: 'ending', id: h.id, title: h.title, kind: h.kind }, `\n★ Ending: ${h.title} (${h.kind})`);
-    if (h.type === 'video') emit({ type: 'video', id: h.id }, `  · video ${h.id}`);
-    if ((h.type === 'wait' || h.type === 'pause') && !o.quiet && h.reason !== 'transition') emit({ type: h.type }, `  · ${h.type}${h.seconds ? ' ' + h.seconds + 's' : ''}`);
+    if (!quiet()) {
+      if (h.type === 'chapter') emit({ type: 'chapter', title: h.title }, `\n=== ${h.title}${h.subtitle ? ' — ' + h.subtitle : ''} ===`);
+      if (h.type === 'video') emit({ type: 'video', id: h.id }, `  · video ${h.id}`);
+      if ((h.type === 'wait' || h.type === 'pause') && !o.quiet && h.reason !== 'transition') emit({ type: h.type }, `  · ${h.type}${h.seconds ? ' ' + h.seconds + 's' : ''}`);
+    }
     r = vm.advance();
   }
-  if (o.json) out(JSON.stringify({ transcript: json, vars: vm.state.vars, choices: taken }, null, 2));
-  else if (!o.quiet) out(`\nvariables: ${Object.entries(vm.state.vars).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ') || '(none)'}`);
+  // Choices and @game results the route never used: the route asked for was not the one played.
+  const unusedGames = Object.entries(gameQueue).flatMap(([k, q]) => q.map(v => `${k}=${v}`));
+  const unused = (stop === 'end' || stop === 'error') && (choices.length || unusedGames.length);
+  const unusedText = !unused ? '' : [
+    choices.length ? `Unused --choices: ${choices.join(',')} (the story ${stop === 'end' ? 'ended' : 'stopped'} after ${taken.length ? `${taken.length} choice${taken.length > 1 ? 's' : ''}: ${taken.join(',')}` : 'no choice'}).` : '',
+    unusedGames.length ? `Unused --game results: ${unusedGames.join(',')} (the route did not reach that many @game).` : '',
+  ].filter(Boolean).join('\n') + '\n  hint: This is not the route you asked for. Check the numbers against the menus above, or see the routes with `shiori explore`.';
+  if (unused) host.exit(1);
+  if (o.json) out(JSON.stringify({ transcript: json, vars: vm.state.vars, choices: taken, ...(unused && choices.length ? { unusedChoices: choices } : {}), ...(unused && unusedGames.length ? { unusedGames } : {}) }, null, 2));
+  else {
+    if (!o.quiet) out(`\nvariables: ${Object.entries(vm.state.vars).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ') || '(none)'}`);
+    if (unused) out('\n' + unusedText);
+  }
 }
 
 function stageSummary(s) {
@@ -356,11 +593,12 @@ async function cmdExplore(o) {
   const res = await load(o._[0] || '.', { skipAssets: true });
   if (failIfErrors(res, o.json)) return;
   const program = res.program;
-  const { persistent, problems } = startData(o, program);
-  if (problems.length) { out(problems.join('\n')); host.exit(1); return; }
+  const { persistent, problems } = startData(o, program, { forExplore: true });
+  if (problems.length) return fail(problems.join('\n'));
   const ex = explore(program, { registry: res.registry, maxStates: o['max-states'] ? Number(o['max-states']) : undefined, persistent });
-  if (o.json) { out(JSON.stringify(ex, null, 2)); return; }
   const partial = ex.truncated;
+  if (ex.errors.length || ex.assertions.length || (!partial && ex.unreachedEndings.length)) host.exit(1);
+  if (o.json) { out(JSON.stringify(ex, null, 2)); return; }
   out(`Explored ${ex.routes.toLocaleString('en-US')} route${ex.routes === 1 ? '' : 's'} (${ex.states.toLocaleString('en-US')} states${ex.passes > 1 ? `, ${ex.passes} playthroughs to cover unlocks` : ''}${ex.randomUsed ? ', including random() outcomes' : ''}).`);
   if (partial) out(`STOPPED EARLY at --max-states ${ex.maxStates} with ${ex.frontier.toLocaleString('en-US')} branches still unexplored, so everything below is partial: "not reached" means "not reached yet". Try --max-states ${ex.maxStates * 8}.`);
   out('');
@@ -370,7 +608,7 @@ async function cmdExplore(o) {
     if (!e.shortest) continue;
     out(`      shortest: ${formatPath(e.shortest.path)}${e.shortest.rolls && e.shortest.rolls.length ? `  (random: ${e.shortest.rolls.join(',')})` : ''}`);
     const args = replayArgs(e);
-    if (args) out(`      replay:   shiori play ${res.base === '.' ? '' : res.base + ' '}${args}${e.shortest.verified === false ? '   (⚠ could not confirm this replay)' : ''}`);
+    if (args) out(`      replay:   shiori play ${res.base === '.' ? '' : shq(res.base) + ' '}${args}${e.shortest.verified === false ? '   (⚠ could not confirm this replay)' : ''}`);
   }
   if (ex.unreachedEndings.length) {
     out('');
@@ -406,7 +644,6 @@ async function cmdExplore(o) {
   if (ex.lines.unseen.length && ex.lines.unseen.length <= 15) for (const l of ex.lines.unseen) out(`  Line ${unseenWord}: ${l.file}:${l.line}`);
   else if (ex.lines.unseen.length) out(`  ${ex.lines.unseen.length} lines are ${unseenWord} (first: ${ex.lines.unseen.slice(0, 5).map(l => l.file + ':' + l.line).join(', ')}).`);
   for (const c of ex.options.neverShown) out(`  Choice ${partial ? 'not offered yet' : 'never offered'}: "${c.text}" (${c.loc.file}:${c.loc.line})${partial ? '' : ' — its condition is never true.'}`);
-  if (ex.errors.length || ex.assertions.length || (!partial && ex.unreachedEndings.length)) host.exit(1);
 }
 
 async function cmdGraph(o) {
@@ -423,7 +660,8 @@ async function cmdStats(o) {
   const res = await load(o._[0] || '.', { skipAssets: true });
   if (failIfErrors(res, o.json)) return;
   const a = analyze(res.program);
-  if (o.json) { const { graph, ...rest } = a; out(JSON.stringify(rest, null, 2)); return; }
+  const notes = Array.isArray(res.program.notes) ? res.program.notes : [];
+  if (o.json) { const { graph, ...rest } = a; out(JSON.stringify({ ...rest, notes }, null, 2)); return; }
   const h = res.program.header;
   out(`${h.title}`);
   out(`  ${a.scenes} scenes · ${a.lines.toLocaleString('en-US')} lines · ${a.reachableWords.toLocaleString('en-US')} words (reachable)`);
@@ -436,7 +674,12 @@ async function cmdStats(o) {
   out('  Lines per speaker:');
   for (const [k, v] of Object.entries(a.perCharacter)) out(`    ${v.name.padEnd(16)} ${String(v.lines).padStart(5)} lines ${String(v.words).padStart(7)} words`);
   out(`    ${'(narration)'.padEnd(16)} ${String(a.narrationLines).padStart(5)} lines`);
-  if (a.unreachableScenes.length) { out(''); out(`  Unreachable scenes: ${a.unreachableScenes.join(', ')}`); }
+  if (a.unreachableScenes.length) { out(''); out(`  Unreachable scenes (W600): ${a.unreachableScenes.join(', ')}`); }
+  if (notes.length) {
+    out('');
+    out(`  Notes (${notes.length}):`);
+    for (const n of notes) out(`    ${n.loc && n.loc.file ? `${n.loc.file}:${n.loc.line}  ` : ''}${n.text}`);
+  }
   if (o['by-scene']) {
     out('');
     out('  Words per scene (narration / dialogue):');
@@ -456,6 +699,10 @@ async function cmdStats(o) {
     }
   }
 }
+
+// Paths the engine loads as they are (checkAssets skips them too).
+const isRemote = (p) => /^(https?:|blob:)/i.test(p);
+const isInline = (p) => /^data:/i.test(p);
 
 async function cmdAssets(o) {
   const res = await load(o._[0] || '.', { skipAssets: true });
@@ -496,7 +743,8 @@ async function cmdAssets(o) {
   }
   const report = { assets: [], characters: [] };
   for (const a of Object.values(decls.assets)) {
-    report.assets.push({ id: a.id, kind: a.kind, path: a.path, exists: host.exists(join(a.path)), desc: a.opts.desc || a.opts.title || null, uses: uses[a.id] || [] });
+    const remote = isRemote(a.path);
+    report.assets.push({ id: a.id, kind: a.kind, path: a.path, exists: remote || isInline(a.path) || host.exists(join(a.path)), ...(remote ? { remote: true } : {}), desc: a.opts.desc || a.opts.title || null, uses: uses[a.id] || [] });
   }
   for (const c of Object.values(decls.characters)) {
     const u = charUse[c.id] || { attrs: {}, scenes: new Set() };
@@ -512,7 +760,8 @@ async function cmdAssets(o) {
     if (!list.length) continue;
     out(`\n${k.toUpperCase()}`);
     for (const a of list) {
-      out(`  ${a.exists ? '✓' : '✗'} ${a.id}  ${a.path}${a.desc ? '  — ' + a.desc : ''}`);
+      const shown = isInline(a.path) ? a.path.slice(0, 40) + (a.path.length > 40 ? '…' : '') + '  (inline data)' : a.path + (a.remote ? '  (remote, not checked)' : '');
+      out(`  ${a.remote ? '↗' : a.exists ? '✓' : '✗'} ${a.id}  ${shown}${a.desc ? '  — ' + a.desc : ''}`);
       if (!a.uses.length) out('      (never used)');
       const seen = new Set();
       for (const u of a.uses) {
@@ -559,38 +808,53 @@ const CLI_HELP = {
   play: HELP.split('\n  play')[1] ? 'shiori play <folder> [options]\n  ' + HELP.split('\n  play')[1].split('\n  explore')[0].trim() : '',
   explore: HELP.split('\n  explore')[1] ? 'shiori explore <folder> [options]\n  ' + HELP.split('\n  explore')[1].split('\n  graph')[0].trim() : '',
   graph: 'shiori graph <folder> [--format mermaid|dot|json]\n  The scene graph: jumps, calls, choices and fall-through between scenes; endings are marked.',
-  stats: 'shiori stats <folder> [--by-scene] [--json]\n  Words, reading time and VNDB length category, narration share, lines per speaker; --by-scene adds a per-scene word table.',
+  stats: 'shiori stats <folder> [--by-scene] [--json]\n  Words, reading time and VNDB length category, narration share, lines per speaker, unreachable scenes and @note notes; --by-scene adds a per-scene word table.',
   assets: 'shiori assets <folder> [--json]\n  Every declared file: exists?, where it is used (with filter/weather/tint), and which expressions each character actually uses.',
   vndb: 'shiori vndb <folder> [--no-explore] [--max-states n] [--json]\n  Advisory read against VNDB\'s guidelines plus a draft entry. Never fails the command: VNDB\'s editors and the author decide.',
   new: 'shiori new <folder>\n  Copy the starter game into a new folder (inside the engine folder if you want `shiori serve`).',
-  serve: 'shiori serve <folder>\n  Serve the engine folder on localhost:8777 and print the URL of the game (with &dev=1).',
+  serve: 'shiori serve [folder]\n  Serve the engine folder on localhost:8777 (PORT=… to change) and print the URL of the game (with &dev=1). The folder defaults to the current one when it holds game.story.',
   explain: 'shiori explain <CODE>\n  What a diagnostic code means and how to fix it.',
   selftest: 'shiori selftest\n  Run the engine\'s own test suite.',
 };
 
 async function cmdDocs(o) {
-  const reg = o.game ? (await load(o.game, { skipAssets: true })).registry : defaultRegistry();
+  let reg = defaultRegistry();
+  let moduleErrors = [];
+  if (o.game) {
+    const res = await load(o.game, { skipAssets: true });
+    // Without its game.story the folder's modules are unknown: say so instead of "nothing called".
+    if (res.noGame) return failIfErrors(res, o.json);
+    reg = res.registry;
+    moduleErrors = res.diagnostics.filter(d => d.code === 'E116');
+    if (moduleErrors.length && !o.json) printDiagnostics(moduleErrors, false);
+  }
+  const extra = moduleErrors.length ? { diagnostics: moduleErrors } : {};
   const name = o._[0];
   if (name && TOPICS[name]) {
     const [title, text] = TOPICS[name];
-    if (text) { out(`# ${title}\n\n${text}`); return; }
-    const tables = tablesReference() + '\n## Diagnostic codes\n\n' + codesReference();
-    const want = { text: 'Text tags', header: 'Header fields', functions: 'Functions', positions: 'Positions', transitions: 'Transitions', weather: 'Weather', filters: 'Filters', codes: 'Diagnostic codes' }[name];
-    const parts = tables.split(/\n(?=## )/);
-    const part = parts.find(p => p.startsWith('## ' + want));
-    out(part ? part.trim() : tables);
+    let body = text;
+    if (!body) {
+      const tables = tablesReference() + '\n## Diagnostic codes\n\n' + codesReference();
+      const want = { text: 'Text tags', header: 'Header fields', functions: 'Functions', positions: 'Positions', transitions: 'Transitions', weather: 'Weather', filters: 'Filters', codes: 'Diagnostic codes' }[name];
+      const part = tables.split(/\n(?=## )/).find(p => p.startsWith('## ' + want));
+      body = part ? part.trim() : tables;
+      if (!o.json) { out(body); return; }
+    } else if (!o.json) { out(`# ${title}\n\n${text}`); return; }
+    out(JSON.stringify({ topic: name, title, text: body }, null, 2));
     return;
   }
-  if (name && CLI_HELP[name] && !reg.get(name)) { out(CLI_HELP[name]); return; }
+  if (name && CLI_HELP[name] && !reg.get(name)) { out(o.json ? JSON.stringify({ command: name, help: CLI_HELP[name] }, null, 2) : CLI_HELP[name]); return; }
   if (name) {
     const c = reg.get(name.replace(/^@/, ''));
     if (!c) {
       const m = didYouMean(name.replace(/^@/, ''), reg.names().concat(Object.keys(TOPICS), Object.keys(CLI_HELP)));
-      out(`Nothing called \`${name}\`.${m ? ` Did you mean \`${m}\`?` : ''}\nTopics: ${Object.keys(TOPICS).join(', ')}\nCLI commands: ${Object.keys(CLI_HELP).join(', ')}\nScript commands: ${reg.names().map(n => '@' + n).join(' ')}`);
+      const failed = moduleErrors.length ? `\n(${moduleErrors.length} module${moduleErrors.length === 1 ? '' : 's'} of ${o.game} could not be loaded, see above; \`${name}\` may be one of their commands.)` : '';
+      if (o.json) return fail(`Nothing called \`${name}\`.`, { hint: m ? `Did you mean \`${m}\`?` : undefined, extra: { ...extra, topics: Object.keys(TOPICS), cliCommands: Object.keys(CLI_HELP), scriptCommands: reg.names() } });
+      out(`Nothing called \`${name}\`.${m ? ` Did you mean \`${m}\`?` : ''}${failed}\nTopics: ${Object.keys(TOPICS).join(', ')}\nCLI commands: ${Object.keys(CLI_HELP).join(', ')}\nScript commands: ${reg.names().map(n => '@' + n).join(' ')}`);
       host.exit(1);
       return;
     }
-    out(o.json ? JSON.stringify({ name: c.name, module: c.module, summary: c.summary, syntax: c.syntax, positional: c.positional, named: c.named, examples: c.examples }, null, 2) : commandDoc(c));
+    out(o.json ? JSON.stringify({ name: c.name, module: c.module, summary: c.summary, syntax: c.syntax, positional: c.positional, named: c.named, examples: c.examples, ...extra }, null, 2) : commandDoc(c));
     return;
   }
   if (o.json) { out(JSON.stringify(reg.names().map(n => { const c = reg.get(n); return { name: n, module: c.module, summary: c.summary, syntax: c.syntax }; }), null, 2)); return; }
@@ -603,23 +867,46 @@ async function cmdDocs(o) {
 
 function cmdExplain(o) {
   const code = (o._[0] || '').toUpperCase();
-  if (!CODES[code]) { out(`Unknown code ${code}. Codes: ${Object.keys(CODES).join(' ')}`); host.exit(1); return; }
+  if (!code) return fail('Which code? For example: shiori explain E113', { hint: `Codes: ${Object.keys(CODES).join(' ')}`, exit: 2 });
+  if (!CODES[code]) {
+    const m = didYouMean(code, Object.keys(CODES));
+    return fail(`Unknown code ${code}.${m ? ` Did you mean ${m}?` : ''}`, { hint: `Codes: ${Object.keys(CODES).join(' ')}` });
+  }
+  if (o.json) { out(JSON.stringify({ code, title: CODES[code], help: CODE_HELP[code] || null }, null, 2)); return; }
   out(`${code}: ${CODES[code]}`);
   if (CODE_HELP[code]) out('\n' + CODE_HELP[code]);
 }
 
 // ------------------------------------------------------------------- main
-const o = parseArgs(host.args);
-const cmd = o._.shift();
-const commands = { assets: cmdAssets, check: cmdCheck, play: cmdPlay, explore: cmdExplore, graph: cmdGraph, stats: cmdStats, vndb: cmdVndb, docs: cmdDocs, explain: cmdExplain };
-if (!cmd || cmd === 'help' || o.help) out(HELP);
-else if (!commands[cmd]) {
-  const m = didYouMean(cmd, Object.keys(commands).concat('new'));
-  out(`Unknown command \`${cmd}\`.${m ? ` Did you mean \`${m}\`?` : ''}\n`);
-  out(HELP);
-  host.exit(2);
-} else {
-  try { await commands[cmd](o); }
-  catch (e) { out(`Internal error: ${e && e.stack || e}`); host.exit(70); }
+
+const COMMANDS = { assets: cmdAssets, check: cmdCheck, play: cmdPlay, explore: cmdExplore, graph: cmdGraph, stats: cmdStats, vndb: cmdVndb, docs: cmdDocs, explain: cmdExplain };
+
+async function main(args) {
+  const cmd = args.find(a => !a.startsWith('-'));
+  if (cmd && !COMMANDS[cmd] && cmd !== 'help') {
+    const m = didYouMean(cmd, Object.keys(COMMANDS).concat('new', 'serve', 'build', 'selftest'));
+    if (jsonMode) return fail(`Unknown command \`${cmd}\`.`, { hint: m ? `Did you mean \`${m}\`?` : 'Run `shiori help` for the commands.', exit: 2 });
+    out(`Unknown command \`${cmd}\`.${m ? ` Did you mean \`${m}\`?` : ''}\n`);
+    out(HELP);
+    host.exit(2);
+    return;
+  }
+  const { o, error } = parseArgs(args, cmd);
+  if (error) return fail(error.message, { hint: error.hint, exit: 2 });
+  o._.shift();
+  if (!cmd || cmd === 'help' || o.help) { out(jsonMode ? JSON.stringify({ usage: HELP }, null, 2) : HELP); return; }
+  await COMMANDS[cmd](o);
 }
-if (host.kind === 'jsc' && globalThis.__shioriExit) throw new Error('__shiori_exit_' + globalThis.__shioriExit);
+
+// Run the CLI with a host (tools/host.js, or a test double).
+export async function runCli(h) {
+  host = h;
+  jsonMode = h.args.includes('--json');
+  try { await main(h.args); }
+  catch (e) { fail(`Internal error: ${describeError(e)}`, { exit: 70 }); }
+}
+
+if (!globalThis.__shioriEmbedded) {
+  await runCli(await createHost(typeof arguments !== 'undefined' ? arguments : undefined));
+  if (host.kind === 'jsc' && globalThis.__shioriExit) throw new Error('__shiori_exit_' + globalThis.__shioriExit);
+}
