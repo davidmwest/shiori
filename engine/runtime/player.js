@@ -96,9 +96,18 @@ export class Player {
       persistent,
       onPersistentChange: () => {
         clearTimeout(this._pt);
-        this._pt = setTimeout(() => this.storage.savePersistent(this.vm.persistent), 400);
+        this._pt = setTimeout(() => this.flushPersistent(), 400);
       },
     });
+  }
+
+  // Write persistent data (read lines, seen choices, endings) now if a write
+  // is waiting: the tab may be closing.
+  flushPersistent() {
+    if (this._pt == null) return;
+    clearTimeout(this._pt);
+    this._pt = null;
+    this.storage.savePersistent(this.vm.persistent);
   }
 
   bootError(list) {
@@ -265,7 +274,8 @@ export class Player {
       default: {
         const fn = this.effectHandlers[e.type];
         if (fn) { try { fn(e, this); } catch (err) { console.warn('[shiori] effect handler failed', e.type, err); } }
-        else console.warn('[shiori] no handler for effect', e.type);
+        // `scene` marks each scene entry, for modules and tools; the player has nothing to do.
+        else if (e.type !== 'scene') console.warn('[shiori] no handler for effect', e.type);
       }
     }
   }
@@ -632,6 +642,9 @@ export class Player {
     });
     window.addEventListener('keyup', (e) => { if (e.key === 'Control' && this.ctrlSkip) { this.ctrlSkip = false; this.setSkip(false); } });
     window.addEventListener('blur', () => { if (this.ctrlSkip) { this.ctrlSkip = false; this.setSkip(false); } });
+    // Persistent writes wait 400 ms; don't lose the last ones when the tab closes or is hidden.
+    window.addEventListener('pagehide', () => this.flushPersistent());
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this.flushPersistent(); });
   }
 
   // ---- automation / dev -----------------------------------------------

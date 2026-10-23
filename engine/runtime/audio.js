@@ -107,6 +107,10 @@ export class AudioMixer {
   }
 
   // ---- decks ---------------------------------------------------------------
+  // A deck's level is the script's volume= times the asset's own volume.
+  level(spec, a) { return (spec.volume != null ? spec.volume : 1) * (a.opts.volume != null ? a.opts.volume : 1); }
+  looping(spec, a, loopDefault) { return spec.loop != null ? spec.loop : (a.opts.loop != null ? a.opts.loop : loopDefault); }
+
   async makeDeck(spec, bus, loopDefault) {
     const a = this.asset(spec.id);
     if (!a) return null;
@@ -114,9 +118,7 @@ export class AudioMixer {
     const gain = c.createGain();
     gain.gain.value = 0;
     gain.connect(bus);
-    const vol = (spec.volume != null ? spec.volume : 1) * (a.opts.volume != null ? a.opts.volume : 1);
-    const loop = spec.loop != null ? spec.loop : (a.opts.loop != null ? a.opts.loop : loopDefault);
-    const deck = { id: spec.id, gain, vol, stopped: false };
+    const deck = { id: spec.id, gain, vol: this.level(spec, a), loop: this.looping(spec, a, loopDefault), stopped: false };
     if (this.isLmn(a)) {
       const song = await this.song(a);
       if (!song || deck.stopped) return deck;
@@ -124,19 +126,30 @@ export class AudioMixer {
       p.ctx = c;
       p.master = { input: gain };
       p.setSong(song);
-      p.onEnd = () => { if (loop && !deck.stopped) p.play(0); };
+      p.onEnd = () => { if (deck.loop && !deck.stopped) p.play(0); };
       deck.lmn = p;
       p.play(0);
     } else {
       const buf = await this.buffer(a);
       if (!buf || deck.stopped) return deck;
       const src = c.createBufferSource();
-      src.buffer = buf; src.loop = loop;
+      src.buffer = buf; src.loop = deck.loop;
       src.connect(gain);
       src.start();
       deck.src = src;
     }
     return deck;
+  }
+
+  // The track on this deck is asked for again (a new volume= or loop=, or a
+  // sync after loading): it keeps playing and moves to the new level.
+  retune(deck, spec, fade, loopDefault) {
+    const a = this.asset(spec.id);
+    if (!a) return;
+    deck.vol = this.level(spec, a);
+    deck.loop = this.looping(spec, a, loopDefault);
+    if (deck.src) deck.src.loop = deck.loop;
+    this.fadeIn(deck, fade);
   }
 
   fadeIn(deck, fade) {
@@ -164,7 +177,11 @@ export class AudioMixer {
   async playMusic(spec, fade = 1.5) {
     this.wanted.music = spec;
     if (!this.ctx) return;
-    if (this.music && this.music.id === spec.id && !this.music.stopped) return;
+    if (this.music && this.music.id === spec.id && !this.music.stopped) {
+      this.musicToken = (this.musicToken || 0) + 1; // a track still loading must not replace it
+      this.retune(this.music, spec, fade, true);
+      return;
+    }
     const old = this.music;
     const token = this.musicToken = (this.musicToken || 0) + 1;
     const deck = await this.makeDeck(spec, this.duckGain, true);
@@ -184,7 +201,11 @@ export class AudioMixer {
   async playAmbience(spec, fade = 1) {
     this.wanted.ambience = spec;
     if (!this.ctx) return;
-    if (this.ambience && this.ambience.id === spec.id && !this.ambience.stopped) return;
+    if (this.ambience && this.ambience.id === spec.id && !this.ambience.stopped) {
+      this.ambToken = (this.ambToken || 0) + 1;
+      this.retune(this.ambience, spec, fade, true);
+      return;
+    }
     const old = this.ambience;
     const token = this.ambToken = (this.ambToken || 0) + 1;
     const deck = await this.makeDeck(spec, this.bus.ambience, true);

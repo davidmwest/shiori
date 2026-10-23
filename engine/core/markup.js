@@ -19,6 +19,9 @@ export const TAGS = {
   br:    { paired: false, value: 'none',     doc: 'Line break inside one line of text.' },
 };
 
+// Own properties only: `{constructor}` is not a tag.
+const tagDef = (name) => Object.hasOwn(TAGS, name) ? TAGS[name] : null;
+
 const NUMBER_HINT = {
   w: 'Write `{w=0.5}` to pause for half a second, or `{w}` to wait for a click.',
   size: '1 is normal size: `{size=1.5}…{/size}` is half again as big, `{size=0.8}…{/size}` smaller.',
@@ -59,7 +62,7 @@ export function parseMarkup(text) {
     }
     if (body.startsWith('/')) {
       const name = body.slice(1).trim();
-      if (!TAGS[name] || !TAGS[name].paired) {
+      if (!tagDef(name) || !tagDef(name).paired) {
         const s = didYouMean(name, Object.keys(TAGS).filter(k => TAGS[k].paired));
         errors.push({ code: 'E500', message: `Unknown closing tag \`{/${name}}\`.`, col, hint: s ? `Did you mean \`{/${s}}\`?` : undefined });
         continue;
@@ -83,7 +86,7 @@ export function parseMarkup(text) {
       continue;
     }
     const name = m[1], value = m[2] != null ? m[2].trim().replace(/^"(.*)"$/, '$1') : null;
-    const def = TAGS[name];
+    const def = tagDef(name);
     if (!def) {
       const s = didYouMean(name, Object.keys(TAGS));
       errors.push({ code: 'E500', message: `Unknown text tag \`{${name}}\`.`, col, hint: s ? `Did you mean \`{${s}}\`?` : 'See "Text markup" in the spec for the list of tags.' });
