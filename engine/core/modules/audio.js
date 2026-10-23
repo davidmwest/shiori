@@ -22,14 +22,23 @@ export default {
       compile(cmd, ctx, args) {
         const a = ctx.decls.assets[args.pos.track];
         if (a) (a.usedAs = a.usedAs || {}).music = true;
-        return { op: 'cmd', name: 'music', args: { track: args.pos.track, ...args.named } };
+        // Which of volume=/loop= the script wrote: re-stating the track that
+        // is playing changes only those (a bare `@music theme` keeps a duck).
+        const given = ['volume', 'loop'].filter(k => cmd.args.some(x => x.key === k));
+        return { op: 'cmd', name: 'music', args: { track: args.pos.track, ...args.named, given } };
       },
       exec(ins, vm) {
         const a = ins.args;
         if (a.track === 'stop') vm.state.audio.music = null;
         else {
           const cur = vm.state.audio.music;
-          if (cur && cur.id === a.track) return; // already playing: keep going
+          if (cur && cur.id === a.track) {
+            // Same track: it keeps playing; only written arguments change it.
+            let changed = false;
+            for (const k of a.given || []) if (a[k] != null && cur[k] !== a[k]) { cur[k] = a[k]; changed = true; }
+            if (changed) vm.emit({ type: 'audio', op: 'music', music: clone(cur), fade: a.fade, same: true });
+            return;
+          }
           vm.state.audio.music = { id: a.track, volume: a.volume, loop: a.loop };
           vm.persistent.music[a.track] = 1;
           vm.persistentChanged();

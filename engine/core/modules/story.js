@@ -1,7 +1,24 @@
 // Story flow: variables, calls, endings, chapters, input, waits, gameplay.
 
-import { parseAssignment, ExprError } from '../expr.js';
+import { parseAssignment, parseExpr, ExprError } from '../expr.js';
 import { parseMarkup, plainText } from '../markup.js';
+
+// Where the value starts in `name = value` (0-based offset into raw), or -1.
+export function assignmentValueStart(raw) {
+  const m = /^\s*[A-Za-z_][A-Za-z0-9_]*\s*(?:\+=|-=|\*=|\/=|=(?!=))\s*/.exec(raw);
+  return m ? m[0].length : -1;
+}
+
+// Offset into raw of an error thrown by parseAssignment(raw). Errors about
+// the assignment's shape (E402) are already measured from the start; errors
+// in the value are re-measured here, so the caret lands inside the value.
+export function assignmentErrorPos(raw, e) {
+  const off = e.code === 'E402' ? -1 : assignmentValueStart(raw);
+  if (off >= 0) {
+    try { parseExpr(raw.slice(off)); } catch (e2) { if (e2 instanceof ExprError) return off + (e2.pos || 0); }
+  }
+  return e.pos || 0;
+}
 
 export default {
   name: 'story',
@@ -16,7 +33,7 @@ export default {
         let a;
         try { a = parseAssignment(cmd.raw); }
         catch (e) {
-          if (e instanceof ExprError) { ctx.diags.error(e.code, e.message, { ...cmd.loc, col: cmd.rawCol + (e.pos || 0) }, e.hint); return null; }
+          if (e instanceof ExprError) { ctx.diags.error(e.code, e.message, { ...cmd.loc, col: cmd.rawCol + assignmentErrorPos(cmd.raw, e) }, e.hint); return null; }
           throw e;
         }
         const v = ctx.decls.vars[a.name];
@@ -26,14 +43,23 @@ export default {
           return null;
         }
         v.written = true;
-        ctx.checkRefs(a.value, cmd.loc, cmd.rawCol + a.valueOffset);
+        const valueCol = cmd.rawCol + Math.max(0, assignmentValueStart(cmd.raw));
+        // `@set trust = trust + 1` reads trust only to change it: that alone
+        // doesn't count as a read (W612), any more than `@set trust += 1` does.
+        const wasRead = v.read;
+        ctx.checkRefs(a.value, cmd.loc, valueCol);
+        v.read = wasRead;
         const t = ctx.typeOf(a.value);
+        const typeName = (x) => x === 'bool' ? 'true/false value' : x;
         if (a.op === '=' && t !== 'any' && t !== v.type) {
-          ctx.diags.error('E403', `\`${a.name}\` holds a ${v.type === 'bool' ? 'true/false value' : v.type}, but this assigns a ${t === 'bool' ? 'true/false value' : t}.`, cmd.loc,
+          ctx.diags.error('E403', `\`${a.name}\` holds a ${typeName(v.type)}, but this assigns a ${typeName(t)}.`, cmd.loc,
             `It was declared as \`@var ${a.name} = ${JSON.stringify(v.init)}\`.`);
         }
         if (a.op !== '=' && v.type !== 'number' && !(a.op === '+=' && v.type === 'string')) {
           ctx.diags.error('E403', `\`${a.op}\` needs a number variable, and \`${a.name}\` is a ${v.type}.`, cmd.loc);
+        } else if (a.op !== '=' && v.type === 'number' && t !== 'number' && t !== 'any') {
+          ctx.diags.error('E403', `\`${a.op}\` on the number variable \`${a.name}\` needs a number, but this is a ${typeName(t)}.`, { ...cmd.loc, col: valueCol },
+            `Write a number, e.g. \`@set ${a.name} ${a.op} 1\`.`);
         }
         return { op: 'set', name: a.name, opr: a.op, value: a.value };
       },
@@ -75,11 +101,17 @@ export default {
       named: { kind: { type: 'enum:true|good|normal|bad|joke', default: 'normal', doc: 'What kind of ending it is.' } },
       examples: ['@ending lanterns_home "Lanterns Home" kind=true', '@ending drowned "Undertow" kind=bad'],
       compile(cmd, ctx, args) {
-        ctx.defineEnding(args.pos.id, args.pos.title, args.named.kind, cmd.loc);
+        const given = { title: args.pos.title != null && args.pos.title !== '', kind: cmd.args.some(x => x.key === 'kind') };
+        ctx.defineEnding(args.pos.id, args.pos.title, args.named.kind, cmd.loc, given);
         return { op: 'cmd', name: 'ending', args: { id: args.pos.id, title: args.pos.title || args.pos.id, kind: args.named.kind } };
       },
       exec(ins, vm) {
-        const a = ins.args;
+        // Every site of an ending records the declared title and kind, so the
+        // card, the persistent record, explore and the VNDB report agree.
+        const a = { ...ins.args };
+        const endings = vm.program.decls && vm.program.decls.endings;
+        const d = endings && Object.prototype.hasOwnProperty.call(endings, a.id) ? endings[a.id] : null;
+        if (d) { a.title = d.title; a.kind = d.kind; }
         const now = Date.now();
         const rec = vm.persistent.endings[a.id];
         if (rec) rec.count++; else vm.persistent.endings[a.id] = { title: a.title, kind: a.kind, first: now, count: 1 };
@@ -104,11 +136,16 @@ export default {
       name: 'assert', raw: true,
       summary: 'Check a condition while testing. `shiori explore` reports every assertion that can fail.',
       syntax: '@assert <condition> ["message"]',
-      examples: ['@assert trust >= 0', '@assert visited("harbor") > 0'],
+      examples: ['@assert trust >= 0', '@assert visited("harbor") > 0', '@assert route == "rin" "Only Rin\'s route reaches the roof"'],
       compile(cmd, ctx) {
-        let src = cmd.raw, message = null;
-        const m = /^(.*?)\s+"([^"]*)"\s*$/.exec(src);
-        if (m) { src = m[1]; message = m[2]; }
+        // A trailing "string" is the message only when the text before it is
+        // already a complete condition, so `@assert route == "rin"` keeps
+        // its last operand.
+        let src = cmd.raw || '', message = null;
+        if (!parses(src)) {
+          const m = /^(.*?)\s+"([^"]*)"\s*$/.exec(src);
+          if (m && parses(m[1])) { src = m[1]; message = m[2]; }
+        }
         const cond = ctx.compileExpr(src, cmd.loc, cmd.rawCol);
         return cond ? { op: 'assert', cond, message, src } : null;
       },
@@ -126,12 +163,16 @@ export default {
       },
     },
     {
-      name: 'note',
+      name: 'note', topLevel: true,
       summary: 'An author\'s note. Ignored by the game; listed by `shiori stats`.',
       syntax: '@note "text"',
       positional: [{ name: 'text', type: 'string', rest: true }],
       examples: ['@note "TODO: rewrite this scene after chapter 3 changes"'],
-      compile() { return null; },
+      compile(cmd, ctx, args) {
+        const text = (args && args.rest || []).map(r => r.value).join(' ').trim();
+        if (text && ctx.addNote) ctx.addNote(text, cmd.loc);
+        return null;
+      },
     },
     {
       name: 'input',
@@ -217,6 +258,10 @@ export default {
     },
   ],
 };
+
+function parses(src) {
+  try { parseExpr(src); return true; } catch (e) { if (e instanceof ExprError) return false; throw e; }
+}
 
 export function textPlain(tokens) { return plainText(tokens); }
 export { parseMarkup };
