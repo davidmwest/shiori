@@ -7,6 +7,7 @@
 
 import { Tweens, EASE, lerp } from './tween.js';
 import { Weather, Burst } from './particles.js';
+import { own } from './assets.js';
 
 const TAU = Math.PI * 2;
 
@@ -91,7 +92,7 @@ export class Stage {
   }
 
   async loadWorld(id) {
-    const decl = this.program.decls.assets[id];
+    const decl = own(this.program.decls.assets, id);
     this.worldError = null;
     try {
       const w = await this.ensureWorld();
@@ -110,7 +111,7 @@ export class Stage {
 
   declFor(actor) {
     const d = this.program.decls;
-    return actor.kind === 'character' ? d.characters[actor.id] : d.assets[actor.id];
+    return own(actor.kind === 'character' ? d.characters : d.assets, actor.id) || null;
   }
 
   is3DActor(actor, bg) {
@@ -398,7 +399,7 @@ export class Stage {
     // background
     if (this.bg) {
       if (this.bg.kind === 'color') { ctx.fillStyle = this.bg.color; ctx.fillRect(-W, -H, W * 3, H * 3); }
-      else if (this.bg.kind === 'image') this.drawCover(ctx, this.assets.asset(this.bg.id, W, H), this.program.decls.assets[this.bg.id]);
+      else if (this.bg.kind === 'image') this.drawCover(ctx, this.assets.asset(this.bg.id, W, H), own(this.program.decls.assets, this.bg.id));
     }
     if (isWorld) {
       if (this.world && this.loadedWorld === this.bg.id) {
@@ -416,7 +417,7 @@ export class Stage {
     }
     ctx.restore();
     // CG covers the stage (not affected by the 2D camera)
-    if (this.cg) this.drawCover(ctx, this.assets.asset(this.cg, W, H), this.program.decls.assets[this.cg]);
+    if (this.cg) this.drawCover(ctx, this.assets.asset(this.cg, W, H), own(this.program.decls.assets, this.cg));
     for (const w of this.weathers) if (w.layer !== 'back') w.draw(ctx, this.reduceMotion);
     for (const b of this.bursts) b.draw(ctx);
     for (const f of this.filters) if (f.amount > 0.001) this.drawFilter(ctx, f.name, f.amount);

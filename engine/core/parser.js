@@ -77,10 +77,35 @@ function exprCommentAt(s) {
 // (expr.js). Anything else (\n, \t, a \u code) is E110: dropping the backslash
 // would silently change the text.
 const ARG_ESCAPES = ['\\', '"', "'"];
-function argEscapeHint(e) {
-  if (e === 'n' || e === 'r') return 'A quoted argument cannot hold a line break. For a break in dialogue or narration, put `{br}` in the text line instead.';
+function argEscapeHint(e, what) {
+  if (e === 'n' || e === 'r') return `A quoted ${what} cannot hold a line break. For a break in dialogue or narration, put \`{br}\` in the text line instead.`;
   if (e === 'u' || e === 'x') return 'Type the character itself, e.g. `—` rather than `\\u2014`.';
   return 'Only `\\"`, `\\\'` and `\\\\` are escapes. Write `\\\\` for a backslash, and `/` between the folders of a path.';
+}
+
+// Read quoted text from s[i] on (just after the opening quote) until
+// isClose(i) says s[i] is the closing quote. Escapes follow ARG_ESCAPES; any
+// other `\x` is E110 with the caret on the backslash, and stays as typed.
+// `col0` is the 0-based column of s[0] in its line; `what` names the thing
+// in messages ("argument", "property value").
+// Returns { value, end (index after the closing quote), closed }.
+function readQuoted(s, i, isClose, col0, diags, loc, what) {
+  let value = '';
+  while (i < s.length) {
+    if (s[i] === '\\' && i + 1 < s.length) {
+      const e = s[i + 1];
+      if (ARG_ESCAPES.includes(e)) value += e;
+      else {
+        diags.error('E110', `Unknown escape \`\\${e}\` in a quoted ${what}.`, { ...loc, col: col0 + i + 1 }, argEscapeHint(e, what));
+        value += '\\' + e;
+      }
+      i += 2;
+      continue;
+    }
+    if (isClose(i)) return { value, end: i + 1, closed: true };
+    value += s[i++];
+  }
+  return { value, end: i, closed: false };
 }
 
 // Split command arguments: words, "quoted strings", key=value, key="quoted".
@@ -100,23 +125,10 @@ export function tokenizeArgs(s, baseCol, diags, loc) {
     if (s[i] === '"' || s[i] === "'") {
       const q = s[i];
       quoted = true;
-      i++;
-      let closed = false;
-      while (i < s.length) {
-        if (s[i] === '\\' && i + 1 < s.length) {
-          const e = s[i + 1];
-          if (ARG_ESCAPES.includes(e)) value += e;
-          else {
-            diags.error('E110', `Unknown escape \`\\${e}\` in a quoted argument.`, { ...loc, col: baseCol + i + 1 }, argEscapeHint(e));
-            value += '\\' + e;
-          }
-          i += 2;
-          continue;
-        }
-        if (s[i] === q) { closed = true; i++; break; }
-        value += s[i++];
-      }
-      if (!closed) diags.error('E110', 'This quoted string is never closed.', { ...loc, col: baseCol + start + 1 }, `Add a closing ${q}.`);
+      const r = readQuoted(s, i + 1, (j) => s[j] === q, baseCol, diags, loc, 'argument');
+      value = r.value;
+      i = r.end;
+      if (!r.closed) diags.error('E110', 'This quoted string is never closed.', { ...loc, col: baseCol + start + 1 }, `Add a closing ${q}.`);
     } else {
       while (i < s.length && s[i] !== ' ' && s[i] !== '\t') value += s[i++];
     }
@@ -348,8 +360,16 @@ export function parseFile(path, text, opts = {}) {
       }
       let value = m[2];
       let quoted = false;
-      const qm = /^"(.*)"$/.exec(value);
-      if (qm) { value = qm[1].replace(/\\"/g, '"'); quoted = true; }
+      // `key: "text"`: the value runs from the first quote to the last one,
+      // so a bare " inside it is kept. Escapes follow the rule for quoted
+      // command arguments; an unquoted value keeps its backslashes as typed.
+      if (value.length >= 2 && value[0] === '"' && value[value.length - 1] === '"') {
+        const col0 = ln.ws.length + ln.text.length - value.length; // 0-based column of the opening quote
+        const r = readQuoted(value, 1, (j) => j === value.length - 1, col0, diags, loc(ln), 'property value');
+        if (!r.closed) diags.error('E110', 'This quoted string is never closed.', loc(ln, col0 + 1), 'Add a closing ".');
+        value = r.value;
+        quoted = true;
+      }
       node.props.push({ key: m[1], value, quoted, loc: loc(ln, ln.ws.length + 1) });
       p++;
     }

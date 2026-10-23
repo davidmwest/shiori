@@ -4,6 +4,14 @@
 // before its art exists.
 
 import { fillTemplate } from '../core/assets.js';
+import { has } from '../core/registry.js';
+
+// An entry of a program table by a name from the script, own properties only
+// (a program read back from JSON has tables with a prototype).
+export const own = (table, key) => has(table, key) ? table[key] : undefined;
+// A character's attribute values: no prototype, so `{group}` placeholders
+// only ever match the character's own groups.
+export const attrsOf = (c, attrs) => Object.assign(Object.create(null), c.defaults, attrs);
 
 export class Assets {
   constructor(resolveUrl, program) {
@@ -52,12 +60,12 @@ export class Assets {
 
   // ---- characters ---------------------------------------------------------
   layerPaths(c, attrs) {
-    const a = { ...c.defaults, ...(attrs || {}) };
+    const a = attrsOf(c, attrs);
     if (c.sprite) return [fillTemplate(c.sprite, a)];
     return c.layers.map(l => fillTemplate(l, a));
   }
   overlayPath(c, key, attrs) {
-    return c[key] ? fillTemplate(c[key], { ...c.defaults, ...(attrs || {}) }) : null;
+    return c[key] ? fillTemplate(c[key], attrsOf(c, attrs)) : null;
   }
 
   async loadCharacter(c, attrs) {
@@ -127,7 +135,7 @@ export class Assets {
     ctx.textAlign = 'center';
     ctx.fillText(c.name || c.id, w / 2, 640);
     ctx.font = '28px system-ui, sans-serif';
-    const a = Object.values({ ...c.defaults, ...(attrs || {}) }).join(' · ');
+    const a = Object.values(attrsOf(c, attrs)).join(' · ');
     if (a) ctx.fillText(a, w / 2, 690);
     ctx.font = '22px system-ui, sans-serif';
     ctx.fillText('(placeholder — art missing)', w / 2, 740);
@@ -160,7 +168,7 @@ export class Assets {
 
   // Image for an asset id (background, CG, prop), or a placeholder.
   asset(id, w, h) {
-    const a = this.program.decls.assets[id];
+    const a = own(this.program.decls.assets, id);
     if (!a) return this.placeholderImage(id, w, h);
     const c = this.get(a.path);
     if (c) return c;
@@ -172,10 +180,10 @@ export class Assets {
   preloadEffect(e, timeout = 2500) {
     const jobs = [];
     const decls = this.program.decls;
-    const addAsset = (id) => { const a = decls.assets[id]; if (a && a.kind === 'image') jobs.push(this.load(a.path)); };
+    const addAsset = (id) => { const a = own(decls.assets, id); if (a && a.kind === 'image') jobs.push(this.load(a.path)); };
     const addActor = (actor) => {
       if (!actor) return;
-      if (actor.kind === 'character') { const c = decls.characters[actor.id]; if (c) jobs.push(this.loadCharacter(c, actor.attrs)); }
+      if (actor.kind === 'character') { const c = own(decls.characters, actor.id); if (c) jobs.push(this.loadCharacter(c, actor.attrs)); }
       else addAsset(actor.id);
     };
     if (e.type === 'stage') {
@@ -202,10 +210,13 @@ export class Assets {
       const ins = code[i];
       if (ins.op !== 'cmd') continue;
       const a = ins.args;
-      if ((ins.name === 'scene' || ins.name === 'bg') && a.bg && decls.assets[a.bg] && decls.assets[a.bg].kind === 'image') this.load(decls.assets[a.bg].path);
-      if (ins.name === 'cg' && a.image && decls.assets[a.image]) this.load(decls.assets[a.image].path);
-      if (ins.name === 'show' && a.kind === 'character') { const c = decls.characters[a.who]; if (c) this.loadCharacter(c, a.attrs); }
-      if (ins.name === 'show' && a.kind === 'image' && decls.assets[a.who]) this.load(decls.assets[a.who].path);
+      const bg = (ins.name === 'scene' || ins.name === 'bg') && a.bg && own(decls.assets, a.bg);
+      if (bg && bg.kind === 'image') this.load(bg.path);
+      const cg = ins.name === 'cg' && a.image && own(decls.assets, a.image);
+      if (cg) this.load(cg.path);
+      if (ins.name === 'show' && a.kind === 'character') { const c = own(decls.characters, a.who); if (c) this.loadCharacter(c, a.attrs); }
+      const prop = ins.name === 'show' && a.kind === 'image' && a.who && own(decls.assets, a.who);
+      if (prop) this.load(prop.path);
     }
   }
 }

@@ -18,6 +18,11 @@ import * as THREE from 'three';
 const DEG = Math.PI / 180;
 const UP = new THREE.Vector3(0, 1, 0);
 
+// Mark names, attribute values and ease names come from the script or a world
+// file: look them up as own properties only, so `constructor` or `toString`
+// never finds an Object.prototype member.
+const own = (o, k) => (o != null && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : undefined);
+
 // ---------------------------------------------------------------------------
 // Easing
 
@@ -41,7 +46,7 @@ const EASE_ALIASES = { 'ease-in': 'in', easein: 'in', 'ease-out': 'out', easeout
 /** Returns an easing function for a Shiori ease name (unknown names → inout). */
 export function easing(name) {
   const key = String(name || 'inout').toLowerCase();
-  return EASE_FUNCS[key] || EASE_FUNCS[EASE_ALIASES[key]] || EASE_FUNCS.inout;
+  return own(EASE_FUNCS, key) || own(EASE_FUNCS, own(EASE_ALIASES, key)) || EASE_FUNCS.inout;
 }
 
 const clamp01 = v => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -204,7 +209,7 @@ export async function createWorld3D({ width = 1280, height = 720, resolveUrl, lo
 
   // A normalized mark: { src, pos(out) → Vector3|null, look(out) → Vector3|null, fov }
   function normalizeMarks(raw) {
-    const out = {};
+    const out = Object.create(null);
     for (const [name, m] of Object.entries(raw || {})) {
       if (m == null) continue;
       out[name] = makeMark(name, m, raw);
@@ -235,7 +240,7 @@ export async function createWorld3D({ width = 1280, height = 720, resolveUrl, lo
   function resolveLookSpec(look, out, raw) {
     if (typeof look === 'function') { const r = look(out); return r && r.isVector3 ? (r === out ? out : out.copy(r)) : null; }
     if (typeof look === 'string') {
-      const other = raw && raw[look];
+      const other = own(raw, look);
       if (!other) return null;
       if (other.isObject3D || other.isVector3 || Array.isArray(other)) return toVec3(other, out);
       return toVec3(other.position, out);
@@ -246,7 +251,7 @@ export async function createWorld3D({ width = 1280, height = 720, resolveUrl, lo
   const warned = new Set();
   function warnOnce(key, msg) { if (warned.has(key)) return; warned.add(key); console.warn('[world3d] ' + msg); }
 
-  function getMark(name) { return name && current && current.marks[name] ? current.marks[name] : null; }
+  function getMark(name) { return (name && current && own(current.marks, name)) || null; }
   function markPos(name, out) { const m = getMark(name); return m ? m.pos(out) : null; }
 
   // =========================================================================
@@ -499,8 +504,8 @@ export async function createWorld3D({ width = 1280, height = 720, resolveUrl, lo
     if (!root) throw new Error(`${label}: ${decl.path} contains no scene.`);
     scene.add(root);
     root.updateMatrixWorld(true);
-    const rawMarks = {};
-    const byName = {};
+    const rawMarks = Object.create(null);  // node names from the file
+    const byName = Object.create(null);
     root.traverse(o => { if (o.name) byName[o.name.toLowerCase()] = o; });
     root.traverse(o => {
       const m = /^mark_(.+)$/i.exec(o.name || '');
@@ -635,7 +640,7 @@ export async function createWorld3D({ width = 1280, height = 720, resolveUrl, lo
 
     // Check declared marks.
     const declared = Array.isArray(opts.marks) ? opts.marks : typeof opts.marks === 'string' ? opts.marks.split(/[\s,]+/).filter(Boolean) : [];
-    const missing = declared.filter(n => !w.marks[n]);
+    const missing = declared.filter(n => !own(w.marks, n));
     if (missing.length) console.warn(`[world3d] ${label} does not define mark(s): ${missing.join(', ')}`);
 
     // Make sure actors can be lit even in worlds that use only custom shaders.
@@ -897,7 +902,7 @@ export async function createWorld3D({ width = 1280, height = 720, resolveUrl, lo
       root: new THREE.Group(), holder: new THREE.Group(), obj: null, api: null, vrm: null, mixer: null,
       alpha: 0, fade: null, showTime: time, hiding: false, removed: false,
       height: 1.6, mats: [], fadedState: null, placed: false, speaking: false,
-      expr: {}, exprTarget: {}, blink: { next: 2 + Math.random() * 3, t: -1 }, mouth: 0,
+      expr: Object.create(null), exprTarget: Object.create(null), blink: { next: 2 + Math.random() * 3, t: -1 }, mouth: 0,
     };
     a.root.name = 'actor_' + actor.id;
     a.root.add(a.holder);
@@ -942,10 +947,10 @@ export async function createWorld3D({ width = 1280, height = 720, resolveUrl, lo
   function applyAttrs(a, attrs) {
     if (a.api && typeof a.api.setAttrs === 'function') safeCall(a, () => a.api.setAttrs({ ...(attrs || {}) }));
     if (a.vrm && a.vrm.expressionManager) {
-      const target = {};
+      const target = Object.create(null);
       for (const n of VRM_EXPR_NAMES) target[n] = 0;
       for (const v of attrValues(attrs)) {
-        const m = VRM_EXPRESSIONS[v];
+        const m = own(VRM_EXPRESSIONS, v);
         if (m) target[m[0]] = Math.max(target[m[0]], m[1]);
         else if (m === undefined && a.vrm.expressionManager.getExpression && a.vrm.expressionManager.getExpression(v)) target[v] = 1;
       }
@@ -1141,7 +1146,7 @@ export async function createWorld3D({ width = 1280, height = 720, resolveUrl, lo
     hideActor,
     setSpeaking,
     markNames: () => (current ? Object.keys(current.marks) : []),
-    hasMark: name => !!(current && name && current.marks[name]),
+    hasMark: name => !!(current && name && own(current.marks, name)),
     update,
     render,
     resize,
