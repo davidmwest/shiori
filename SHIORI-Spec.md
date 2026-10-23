@@ -229,9 +229,11 @@ Field names are lowercase. Unknown fields are a warning with a suggestion (W604)
 ```
 
 - `#`, a space, the scene id, then optionally a title in double quotes, and nothing else: `# harbor bg=dusk` is an error (E104); put `@scene dusk` on the next line. The `#` must be in column 1.
+- In the title, as in every quoted command argument (2.9), a backslash escapes only `\"`, `\'` and `\\`. Anything else, such as `\n` or `\u00e9`, is error E110: type the character itself (`é`), and for a line break put `{br}` in a dialogue or narration line.
 - Ids use letters, digits, `_` and `.`, and start with a letter or `_`: `ch1.harbor` is fine.
 - A scene runs from its heading to the next heading.
-- **Jumps:** `-> scene_id` goes to a scene. `-> END`, in capitals, ends the game (back to the title screen). `@jump scene_id` is the same as `->`. Lines after a jump in the same block never run; `shiori check` warns about them (W622).
+- **Jumps:** `-> scene_id` goes to a scene. `-> END`, in capitals, ends the game (back to the title screen). `@jump scene_id` is the same as `->`.
+- **Code after a jump never runs:** lines after `->`, `@jump` or `@return` in the same block, and lines after a menu or an `@if`/`@else` whose every path jumps away. `shiori check` warns about them (W622). Declarations and `@note` may stand anywhere. Put an `@ending` above its `-> END`, or it is never recorded.
 - **Fall-through:** if a scene ends without a jump, the story continues into the next scene *in the same file*. At the end of a file there is nothing to continue into, so the game ends there; `shiori check` warns (W603). End the last scene of each file with an explicit jump or `-> END`.
 - **Calls:** `@call flashback` runs the scene `flashback` until it reaches `@return`, then continues after the `@call`. Use it for scenes reused from several places. A called scene may contain menus and jump to other scenes; whichever reaches `@return` first returns to the caller.
 - The game starts at the scene named by the header field `start:`, or else at the first scene in `game.story`.
@@ -274,7 +276,7 @@ A line like `Old Man: Who goes there?` (capitalised words before a colon) is sho
 
 **Renaming.** `@rename rin "???"` shows "???" for Rin until `@rename rin` restores her name — across scenes, and in saves. Everything that shows her name uses the current one: the name plate, the backlog, and the `@pov` label.
 
-**Unknown speakers.** A single word before the colon (`Mayor: ...`, `Élodie: ...`; any letters count, not only ASCII) must be a declared character id, or it is error E114 (the hint suggests the character whose display name contains that word). Ids are ASCII: declare `@character elodie name="Élodie"` and write `elodie: ...`. Several capitalised words (`Old Man: ...`, `José Luis: ...`) are taken as narration with warning W608.
+**Unknown speakers.** A single word before the colon (`Mayor: ...`, `Élodie: ...`, `O'Brien: ...`; any letters count, not only ASCII) must be a declared character id, or it is error E114. The hint names the character it most likely means (the same id in other letter case, the display name, or a word of it), or else an id to declare. Ids are ASCII letters, digits and `_`: declare `@character elodie name="Élodie"` and write `elodie: ...`; for `O'Brien:` the hint suggests the id `obrien`. Several capitalised words (`Old Man: ...`, `José Luis: ...`) are taken as narration with warning W608.
 
 W608 also flags other lines that look like dialogue but will be shown as narration: `mio：…` (a full-width colon), `mio:Hi` (no space after the colon), `“Ferryman”: …` (curly quotes), Ren'Py's `mio "Hi"`, and a short Chinese, Japanese, Korean or Thai name before the colon (`ミオ: …`).
 
@@ -383,7 +385,7 @@ If every option is hidden or locked, the menu is skipped with runtime warning R7
 | `+` `-` `*` `/` `%` `( )` | Arithmetic (`+` also joins strings). |
 | `"text"`, `12`, `true`, `false` | Literals. |
 
-Comparisons don't chain: write `1 < x and x < 5`, not `1 < x < 5` (E400). Comparing a true/false value with `<`, `<=`, `>` or `>=`, as in `(1 < x) < 5`, is warning W623. In a string in a condition or value, a backslash escapes only `\"`, `\'` and `\\`; any other, such as `\n`, is an error (E400). For a line break, put `{br}` in the text line.
+Comparisons don't chain: write `1 < x and x < 5`, not `1 < x < 5` (E400). Comparing a true/false value with `<`, `<=`, `>` or `>=`, as in `(1 < x) < 5`, is warning W623. In a string in a condition or value, a backslash escapes only `\"`, `\'` and `\\`; any other, such as `\n`, is an error (E400). For a line break, put `{br}` in the text line. Quoted command arguments follow the same rule, with error E110 (2.9).
 
 Functions: `visited("scene")`, `ending_seen("id")`, `endings_seen()`, `random(1, 6)`, `chance(0.3)`, `min`, `max`, `clamp`, `abs`, `floor`, `ceil`, `round`, `len`, `upper`, `lower` (Appendix B). Random numbers come from a seed stored in the save, so they are reproducible on load and in `shiori play --seed`.
 
@@ -396,11 +398,15 @@ Functions: `visited("scene")`, `ending_seen("id")`, `endings_seen()`, `random(1,
   mio: No.
 ```
 
+An `@elif` that tests the same condition as an earlier branch of its `@if` never runs (W622). Conditions with `random()` or `chance()` are not reported, because they roll again.
+
 Variables appear in text as `{$nickname}`. `@assert trust >= 0` checks an invariant: `shiori explore` reports every route where an assertion fails. A message in quotes may follow the condition: `@assert ran_to == "hinata" or ran_to == "suzu" "ran_to must be set before the finale"` (a trailing quoted string is the message only when the text before it is already a complete condition, so `@assert route == "rin"` compares with `"rin"`).
 
 ## 2.9 Declarations
 
 Declarations are compile-time: they apply to the whole game wherever they appear (but not inside choice or `@if` blocks, E305). Only declarations and `@note` may come before a file's first `# scene_id`; any other command there is an error (E103; an unknown one, E300). Any declaration except `@var` and `@persistent` may take its properties inline (`key=value`) or as an indented block of `key: value` lines (`@video` only in its declaring form, `@video id path`).
+
+**Quoted values.** A command argument with spaces goes in quotes: `title="Lanterns (Main Theme)"`. In a property block quotes are optional: `name: Mio Tanaka` and `name: "Mio Tanaka"` are the same. Inside quotes a backslash escapes only `\"`, `\'` and `\\`, in command arguments, scene titles and quoted property values alike (strings in conditions follow the same rule, 2.8). Anything else, such as `\n` or `\u00e9`, is error E110. Write `\\` for a backslash, `/` between the folders of a path (`bg/dusk.png`, not `bg\dusk.png`), and type any other character as itself.
 
 ### Characters
 
@@ -526,7 +532,7 @@ mio: You came back.
 @stop all
 ```
 
-`@music` with the track that is already playing keeps it playing and applies only the `volume=` and `loop=` written on that line: `@music theme volume=0.4` lowers it, and a bare `@music theme` leaves the volume as it was.
+`@music` with the track that is already playing keeps it playing and applies only the `volume=` and `loop=` written on that line: `@music theme volume=0.4 fade=3` lowers it over 3 seconds, and a bare `@music theme` leaves the volume as it was.
 
 **LMN music.** An `@audio` whose file is an LMN song (`.lmn`, or a `.txt` starting with `LMN 1`) is synthesised live by the player: strings, piano, harp, brass, drums and sung lyrics, with no audio files. Language models can write LMN directly; see `LMN-Spec.md`. Leitmotifs are easy: write a character's theme once and re-arrange it for each mood.
 
@@ -553,7 +559,7 @@ mio: You came back.
 
 - `shiori check` (and the player's developer overlay) report every problem with file, line, column, a code, the source line and usually a fix. Errors stop the game from running; warnings don't.
 - Saves store a stable position (scene, line or menu id, and the nearest line before it), so a save made before you edit the script still loads afterwards: at the same line, menu or command if it can still be found (an edited line is found in its place), otherwise at the start of its scene. A save made at `@input`, `@game`, `@pause`, `@wait`, `@video`, `@chapter` or `@ending` shows it again on load.
-- At runtime the player never crashes on a story problem: a bad jump or failed assertion is logged and shown in developer mode, and the story continues where possible. A condition that can't be evaluated (for example, division by zero) is reported (R700) and counts as false: `@if` moves on to its `@elif` or `@else`, an option's `[if]` hides it and its `[require]` locks it.
+- At runtime the player never crashes on a story problem: a bad jump or failed assertion is logged and shown in developer mode, and the story continues where possible. A condition that can't be evaluated (for example, division by zero) is reported (R700) and counts as false: `@if` moves on to its `@elif` or `@else`, an option's `[if]` hides it and its `[require]` locks it. A module command whose `exec()` throws is reported (R700, naming the module and the command) and skipped.
 
 ---
 
@@ -564,7 +570,7 @@ mio: You came back.
 1. **Plan** the cast (ids, names, colors, attribute groups), the scenes (ids and one-line summaries), the variables, and the endings. Write the declarations first.
 2. **Write** scene by scene. Keep each file to a chapter or a route; list files in `include:`.
 3. **Check:** `shiori check`. Fix every error; read every warning. Repeat until clean. It also warns about scenes that no jump, choice or fall-through leads to (W600) and lines after a jump that can never run (W622).
-4. **Explore:** `shiori explore`. It plays every combination of choices, `@game` results, `@input` answers (the default and, when a condition tests the answer, the strings it is compared with and a sample name) and `random()`/`chance()` outcomes. Games that use `ending_seen()`, `endings_seen()` or `@persistent` are played again from every different set of endings and persistent values a playthrough can end in, up to 16 playthroughs in a row and 64 different sets; past that it stops replaying and says so (R706). Make sure every ending is reachable, no route ends without an `@ending` (unless the game is a kinetic novel), there are no runtime errors, no condition is "always true" by mistake, and no lines are unreachable by accident. Each ending comes with a checked, ready-made `shiori play` command that replays it (with `--seen` for unlocks, `--game` for gameplay results, `--rolls` for random outcomes, and typed answers in `--choices`). Big hub menus and loops multiply routes; if it says STOPPED EARLY, raise `--max-states` (default 250000). After STOPPED EARLY or R706, "not reached" only means "not reached yet".
+4. **Explore:** `shiori explore`. It plays every combination of choices, `@game` results, `@input` answers (the default and, when a condition tests the answer, the strings it is compared with and a sample name) and `random()`/`chance()` outcomes. Games whose conditions use `ending_seen()`, `endings_seen()` or a `@persistent` variable are played again from every different set of endings and persistent values a playthrough can end in, up to 16 playthroughs in a row and 64 different sets; past that it stops replaying and says so (R706). If your unlocks need more playthroughs in a row, raise the first limit with `--passes 32`. Make sure every ending is reachable, no route ends without an `@ending` (unless the game is a kinetic novel), there are no runtime errors, no condition is "always true" by mistake, and no lines are unreachable by accident. A route stops at its first runtime error (R700), so fix those first: whatever comes after one shows as not reached. Under Coverage it also lists each choice that is never offered (its `[if]` is never true) and each one that is never unlocked (its `[require]` is false on every route). Each ending comes with a checked, ready-made `shiori play` command that replays it (with `--seen` for unlocks, `--set` for `@persistent` values, `--game` for gameplay results, `--rolls` for random outcomes, and typed answers in `--choices`). Big hub menus and loops multiply routes; if it says STOPPED EARLY, raise `--max-states` (default 250000). After STOPPED EARLY or R706, "not reached" only means "not reached yet".
 5. **Read** a route with `shiori play --choices 1,2,1` (or `--from scene`, `--set trust=3`, `--seen a,b` — each id counts toward `endings_seen()`; `--set` also sets `@persistent` variables). At an `@input`, the next `--choices` entry is typed as the answer if it isn't a number (`--choices 1,Aoi,2`); otherwise the default is used. Reading your own transcript catches continuity and pacing problems that no checker can — especially inside `@if` branches you didn't take. When it stops at a choice, it prints the exact command to continue. Repeating a list flag adds to it (`--seen a --seen b`).
 6. **VNDB (if you want an entry):** `shiori vndb` reads the game against VNDB's guidelines and drafts the entry. It is advice, not a gate: VNDB's editors judge each game as a whole, and whether your game should be a visual novel at all is your decision.
 7. **Look:** `shiori serve` and open the printed URL (Part 4.6). `player.html?game=…&scene=…&dev=1` jumps straight to a scene with the developer panel; with live reload on, saving a `.story` file updates the running game at the same line.
@@ -590,7 +596,7 @@ VNDB has removed games for having no narration at all (Persona 3/4, Ghost Trick,
 - **Shiori's text is always ADV or NVL**, which VNDB recognises. Mixing both is fine (tag "ADV/NVL Mixing").
 - **Disclose AI content honestly.** VNDB accepts AI-made games and tags them (AI-generated Story, Music, Sprites, Backgrounds, CGs, Voice Acting, Assets). Fill the header field `ai_generated:` (for example `ai_generated: story music`); `shiori vndb` turns it into the right tags, and `translation` sets the release's machine-translation flag.
 - **Fill the header** so the report can draft your entry: `title`, `original_title`, `developer`, `description`, `language`, `status`, `release_type`, `release_date`, `age_rating`, `ero`, `freeware`, `platforms`. Give characters `role`, `gender`, `age`, `description`.
-- VNDB's **length** is the time to finish all endings; the report estimates it from your word count at `reading_speed:` words per minute (Very short < 2 h, Short 2–10 h, Medium 10–30 h, Long 30–50 h, Very long > 50 h). Words are counted in any script: Chinese and Japanese as characters ÷ 2; Thai, Lao, Khmer and Myanmar as about letters ÷ 4; every other script, Korean included, by space-separated words.
+- VNDB's **length** is the time to finish all endings; the report estimates it from your word count at `reading_speed:` words per minute (Very short < 2 h, Short 2–10 h, Medium 10–30 h, Long 30–50 h, Very long > 50 h). Words are counted by spaces in any script, Korean included; each Han or kana character counts as half a word, and Thai, Lao, Khmer or Myanmar text as about one word per 4 letters.
 - Release flags the report fills in for you: resolution, voiced (from `@voice` coverage per character, not counting the protagonist and minor speakers, as VNDB does), animation (VNDB does **not** count zooms, shakes or sprite movement as animation; lip/eye movement and background effects are separate checkboxes), engine name ("Shiori").
 
 ## 3.3 Craft
@@ -709,7 +715,7 @@ export default {
 - Argument types: `string`, `text`, `number`, `int`, `bool`, `duration`, `color`, `ident`, `label` (a scene), `var`, `list`, `position`, `transition`, `ease`, `enum:a|b|c`, `asset:image|audio|world|model|video|gameplay|character` (any combination, plus `none`, `all`, `stop`, `color`).
 - `positional: [{ name, type, required, rest }]`, `named: { key: { type, default, doc } }`, `extraNamed: true` to accept any other `key=value`.
 - Optional `compile(cmd, ctx, args)` returns a custom instruction and may report errors through `ctx.diags`; `decl: true` with `declare(cmd, ctx, args)` makes a compile-time declaration.
-- `exec(ins, vm)` can use `vm.state`, `vm.persistent`, `vm.getVar/setVar`, `vm.emit(effect)`, `vm.halt(h)`, `vm.warn(msg)`.
+- `exec(ins, vm)` can use `vm.state`, `vm.persistent`, `vm.getVar/setVar`, `vm.emit(effect)`, `vm.halt(h)`, `vm.warn(msg)`. If it throws, the player skips the command and reports R700 at the script line, naming the module, the command and the error; the story goes on. `shiori explore` stops that route there and lists it under Problems.
 - `shiori docs <name> --game <folder>` shows your module's commands, generated from the schema.
 
 ## 4.4 3D content
@@ -2001,8 +2007,8 @@ Also: `{$name}` inserts a variable; `{{` and `}}` are literal braces.
 |---|---|
 | `visited(label)` | How many times the scene has been entered in this playthrough (0 if never). |
 | `ending_seen(ending)` | True if this ending has been reached in any playthrough (persistent). |
-| `endings_seen()` | How many different endings have been reached across all playthroughs. |
-| `random(number, number)` | A whole number from a to b, inclusive. Deterministic per save. |
+| `endings_seen()` | How many of this game's endings have been reached across all playthroughs. Endings that are no longer in the game don't count. |
+| `random(number, number)` | A whole number from a to b, inclusive, with the bounds in either order: random(6, 1) is the same as random(1, 6). Deterministic per save. |
 | `chance(number)` | True with probability p (0 to 1). Deterministic per save. |
 | `count(bool, …)` | How many of the conditions are true: count(clue_a, clue_b, clue_c) >= 2. |
 | `min(number, number, …)` | Smallest value. |
@@ -2043,8 +2049,8 @@ Also: `{$name}` inserts a variable; `{{` and `}}` are literal braces.
 | `start:` |  | Scene to start the game at. Defaults to the first scene in game.story. |
 | `author:` |  | Writer(s), for credits. |
 | `website:` |  | Official website URL. |
-| `ai_generated:` |  | Honest disclosure of AI-generated parts that ship in the game: story, sprites, backgrounds, cgs, music, voice, sound, animation, translation, assets — or all / none. Drives the VNDB AI tags. |
-| `reading_speed:` | `200` | Words per minute used for length estimates (CJK: characters ÷ 2). |
+| `ai_generated:` |  | Honest disclosure of AI-generated parts that ship in the game: story, sprites, backgrounds, cgs, music, voice, sound, animation, translation, assets, or all / none. Drives the VNDB AI tags. |
+| `reading_speed:` | `200` | Words per minute used for length estimates. Words are counted by spaces in any script; each Han or kana character counts as half a word, and Thai, Lao, Khmer or Myanmar text as about one word per 4 letters. |
 | `text_speed:` | `45` | Default typing speed in characters per second (players can change it). |
 | `auto_delay:` | `1.2` | Default auto-mode pause after a line, in seconds. |
 | `dialogue_quotes:` |  | Quote marks the textbox adds around dialogue, e.g. “” or 「」. Leave out for none. |
@@ -2073,10 +2079,10 @@ Every message from `shiori check`, `shiori explore` and the player carries one o
 | E107 | Invalid choice line | A choice is `* text`, optionally `* [if cond] text -> scene`. Check the brackets and that the line has text. |
 | E108 | Block is empty | `@if`, `@elif` and `@else` need their lines indented underneath them. |
 | E109 | Misplaced @elif or @else | `@elif` and `@else` must directly follow an `@if`/`@elif` block at the same indentation. |
-| E110 | Unterminated quoted string | A quoted string in a command is missing its closing quote. |
+| E110 | Unclosed quote or unknown escape | A quoted string in a command, a scene title or a `key: value` property has no closing quote, or a backslash before a character that is not an escape. Inside quotes only `\\`, `\"` and `\'` are escapes. For a line break, put `{br}` in the dialogue or narration line instead of `\n`. Type the character itself instead of a `\u` code (`é`, not `\u00e9`). Write `\\` for a backslash, and use `/` between the folders of a path (`bg/dusk.png`, not `bg\dusk.png`). |
 | E111 | Invalid command line | A command is `@name` then arguments, e.g. `@show mio smile at=left`. |
 | E112 | Invalid header line | Header fields (`title: ...`) go at the top of game.story only, after `SHIORI 1` and before the first `@` or `#` line. Check the field's value against Appendix B. |
-| E113 | Included file not found | A file the game needs is missing: the game folder does not exist, it has no game.story, or a file listed in `include:` does not exist. Check the folder name; paths in `include:` are relative to the folder that holds game.story. |
+| E113 | Game folder or story file not found | A file the game needs is missing: the game folder does not exist, it has no game.story, or a file listed in `include:` does not exist. Pass the folder that holds game.story (`shiori check games/my-game`), and check the spelling. Paths in `include:` are relative to that folder. |
 | E114 | Unknown speaker | Dialogue must start with a declared character id (`mio: Hello.`), exactly as declared (ids are case-sensitive and use only ASCII letters, digits and `_`, so `O'Brien` needs an id like `obrien` with `name="O'Brien"`). For a one-off speaker write `"Old Man": ...`. If the line is narration that happens to contain `Word:`, start it with `\| `. |
 | E116 | Module could not be loaded | A file listed in `modules:` could not be imported, or does not `export default { name, commands: [...] }`. |
 | E200 | Unknown scene | A jump, `@call`, `start:` or `visited()` names a scene that does not exist. Check the spelling against the `# id` lines. |
@@ -2091,7 +2097,7 @@ Every message from `shiori check`, `shiori explore` and the player carries one o
 | E301 | Missing required argument | A required argument is missing. `shiori docs <command>` shows the usage. |
 | E302 | Unknown argument | A named argument (`key=`) that the command does not take. `shiori docs <command>` lists them. |
 | E303 | Invalid argument value | An argument value has the wrong form (a position, number, color, enum value...). The message says what is expected. |
-| E304 | Too many arguments | Too many arguments. Most commands take one main argument plus `key=value` options. (`@filter` takes one filter; a new one replaces the old — use `@tint` for an extra wash.) |
+| E304 | Too many arguments | Too many arguments. Most commands take one main argument plus `key=value` options. (`@filter` takes one filter, and a new one replaces the old. Use `@tint` for an extra wash.) |
 | E305 | Declaration not allowed here | Declarations (`@character`, `@image`, `@var` ...) apply to the whole game, so they cannot sit inside a choice or `@if` block. Move them to the top of a file. |
 | E306 | Command needs an indented block | This command needs an indented block of properties under it. |
 | E400 | Invalid expression | The condition or value could not be parsed. Use `==` to compare, `and`/`or`/`not` to combine, quotes for strings. |
@@ -2125,15 +2131,15 @@ Every message from `shiori check`, `shiori explore` and the player carries one o
 | W621 | Every option in a menu is conditional | Every option in this menu is conditional. If none is available, the menu is skipped (R704). Add an unconditional option. |
 | W622 | Code after a jump never runs | These lines can never run: they come after a `->`, `@jump` or `@return` in the same block, or after a menu or `@if`/`@else` whose every path jumps away. Also reported: a choice's `-> target` when the lines under it always jump first, and an `@elif` that repeats an earlier condition. Move the lines above the jump (an `@ending` goes before `-> END`) or delete them. Declarations and `@note` may stand anywhere. |
 | W623 | Comparison with a true/false value | `<`, `<=`, `>` or `>=` has a true/false value on one side. `(1 < x) < 5` compares `1 < x` (true or false) with 5, so it is true for every x above 1. Write a range as `1 < x and x < 5`, and test a true/false value directly (`@if met_rin`, `not met_rin`) or with `==`. |
-| R700 | Runtime error | A problem while the story ran (e.g. division by zero). |
+| R700 | Runtime error | A problem while the story ran: a division by zero, a jump to a missing scene, a module command whose `exec()` threw, a `@game` result that doesn't fit its `into=` variable, and the like. The message says what happened. The player reports it and goes on where it can: a condition that fails counts as false, a failed `@set` keeps the old value, and a failed module command is skipped. In `shiori explore` an error ends its route and is listed under Problems, so fix it first: what comes after it shows as not reached. |
 | R701 | Assertion failed | An `@assert` condition was false on this route. |
 | R702 | Return without call | `@return` was reached without an `@call`. Scenes reached by a jump should end with a jump, not `@return`. |
 | R703 | Infinite loop | The story ran a long time without stopping for the player: a loop of jumps with no text or choice. |
 | R704 | Menu with no available options | A menu had no available options and was skipped. |
 | R705 | 3D camera arguments over a 2D background | `from=`, `look=`, `fov=` and `orbit=` only apply in 3D worlds. |
-| R706 | Unlock exploration was capped | `shiori explore` replays the story from every different set of endings seen and `@persistent` values a playthrough can end in, but it stops after 16 playthroughs in a row or 64 such sets. Endings, lines and choices that need more playthroughs are then listed as not reached, though players may still reach them. |
-| V800 | VNDB eligibility problem |  |
-| V801 | VNDB eligibility warning |  |
+| R706 | Unlock exploration was capped | `shiori explore` replays the story from every different set of endings seen and `@persistent` values a playthrough can end in, but it stops after 16 playthroughs in a row or 64 such sets. Endings, lines and choices that need more playthroughs are then listed as not reached yet, though players may still reach them. If the game needs more playthroughs in a row, raise that limit with `--passes 32`. A `@persistent` value that changes on every playthrough never runs out: raise a counter with `+=` and compare it only with numbers (`@if runs >= 3`), so explore stops counting at the largest one. |
+| V800 | VNDB eligibility problem | Reserved for the VNDB report. `shiori vndb` shows a guideline the game may not meet as a ⚠ item, with what VNDB looks for and what to change. It is advice: VNDB's editors decide. |
+| V801 | VNDB eligibility warning | Reserved for the VNDB report. `shiori vndb` shows things worth checking as ℹ and ☐ items. It is advice: VNDB's editors decide. |
 
 Codes are not contiguous; gaps are unused numbers.
 
@@ -2168,4 +2174,5 @@ cmp         := sum (("=="|"!="|"<"|"<="|">"|">=") sum)?
 sum         := term (("+"|"-") term)* ; term := unary (("*"|"/"|"%") unary)* ; unary := "-"? atom
 atom        := number | string | "true" | "false" | name | name "(" (expr ("," expr)*)? ")" | "(" expr ")"
 string      := '"' ([^"\\] | "\\" ["'\\])* '"' | "'" ([^'\\] | "\\" ["'\\])* "'"
+quoted      := string                           ; arguments, scene titles, quoted property values; another escape is E110
 ```
